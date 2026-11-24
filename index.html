@@ -281,13 +281,14 @@ const CONFIG = {
     bladeDamage: 16, bladeRadius: 78, bladeSpeed: 3.4, bladeHitCooldown: 0.35,
   },
   zombies: {
-    // radius: ayaktaki çarpışma yarıçapı, hitRadius/hitLift: mermi isabet alanı (gövdenin ortası)
+    // radius: ayaktaki hareket çarpışması (engeller, zombilerin birbirini itmesi).
+    // Mermi isabeti ve oyuncuya temas, sprite'ın görünen gövdesinden ölçülen hitbox'ı kullanır (CONFIG.hitbox).
     //        can   hız  yarıçap hasar puan  kütle
-    normal: { hp: 30,  speed: 78,  radius: 16, damage: 10, score: 10,  mass: 1,   hitRadius: 18, hitLift: 30 },
-    runner: { hp: 16,  speed: 138, radius: 14, damage: 8,  score: 15,  mass: 0.7, hitRadius: 16, hitLift: 18 },
-    tank:   { hp: 160, speed: 42,  radius: 24, damage: 22, score: 40,  mass: 3.5, hitRadius: 26, hitLift: 42 },
+    normal: { hp: 30,  speed: 78,  radius: 16, damage: 10, score: 10,  mass: 1 },
+    runner: { hp: 16,  speed: 138, radius: 14, damage: 8,  score: 15,  mass: 0.7 },
+    tank:   { hp: 160, speed: 42,  radius: 24, damage: 22, score: 40,  mass: 3.5 },
     boss: {
-      hp: 3200, speed: 64, radius: 44, damage: 30, score: 1000, mass: 25, hitRadius: 44, hitLift: 70,
+      hp: 3200, speed: 64, radius: 44, damage: 30, score: 1000, mass: 25,
       dashCooldownMin: 3.2, dashCooldownMax: 5.5, // atılma saldırıları arası süre
       dashWindup: 0.8,                            // atılmadan önce uyarı süresi
       dashSpeed: 600, dashDuration: 0.55, dashRange: 650, recoverTime: 0.6,
@@ -336,7 +337,30 @@ const CONFIG = {
     rarityWeights: { common: 60, rare: 30, legendary: 14 },
   },
   nav: { cell: 40, inflate: 14, losRange: 650, refresh: 0.25 },
-  effects: { maxParticles: 700, maxDecals: 140, decalLife: 25, shakeOnHit: 9 },
+  effects: {
+    maxParticles: 700, shakeOnHit: 9,
+    maxDecals: 160, decalLife: 40,      // ölen zombinin kan izi: kaç saniyede tamamen kaybolsun
+    maxDrips: 220, dripLife: 10, dripRate: 1.2, // yaralı zombilerin damlattığı kan (saniyede damla)
+  },
+  // Hitbox: sprite'ın görünen (opak) piksellerinden ölçülen daire. scale < 1 => görselden biraz küçük
+  hitbox: { scale: 0.85 },
+  // Karanlık atmosfer
+  light: {
+    darkness: 0.86,              // karanlık oranı (0 = aydınlık, 1 = zifiri karanlık)
+    radius: 140,                 // oyuncunun etrafındaki ışık halkasının yarıçapı (dünya px)
+    coneRange: 480,              // el fenerinin menzili
+    coneAngle: 0.42,             // fener konisinin yarı açısı (radyan)
+    flicker: 0.04,               // fener titremesi
+    muzzleRadius: 300, muzzleTime: 0.09, // ateş ederken namlu parlamasının aydınlattığı alan / süre
+    color: '5,9,16',             // karanlığın rengi (r,g,b)
+    menuDarkness: 0.55,          // menüdeki karanlık
+    resolution: 0.5,             // ışık katmanı çözünürlüğü (düşük = daha yumuşak ve hızlı)
+    vignette: 0.65,              // ekran kenarı kararması
+    desaturate: 0.38,            // renklerin soluklaşması (0-1)
+    tint: '#b2cfd0',             // soğuk mavi-yeşil ton (multiply)
+    fogAlpha: 0.13, fogSpeed: 14,// sis yoğunluğu ve kayma hızı
+    eyeGlow: 0.9,                // zombi gözlerinin parlaklığı
+  },
 };
 
 /* =====================================================================
@@ -539,7 +563,8 @@ function drawMuteIcon() {
    ===================================================================== */
 let state = 'menu'; // menu | upgrade | playing | paused | gameover | win
 let player = null;
-let zombies = [], bullets = [], particles = [], decals = [], texts = [];
+let zombies = [], bullets = [], particles = [], decals = [], drips = [], texts = [], lights = [];
+let debugHitbox = false; // H tuşu: hitbox'ları göster
 let score = 0, kills = 0, playTime = 0, zombieId = 0;
 let camX = WW / 2, camY = WH / 2, shake = 0, hitVignette = 0, menuTime = 0;
 let banner = null;
@@ -578,6 +603,7 @@ window.addEventListener('keydown', e => {
   }
   if ((state === 'menu') && (e.code === 'Enter' || e.code === 'Space')) newGame();
   if (e.code === 'KeyM') Sound.toggleMute();
+  if (e.code === 'KeyH') debugHitbox = !debugHitbox;
 });
 window.addEventListener('keyup', e => keys.delete(e.code));
 window.addEventListener('blur', () => { releaseInputs(); if (state === 'playing') togglePause(); });
@@ -1369,6 +1395,7 @@ function shoot() {
     }
   }
   p.muzzle = 0.06; p.recoil = 1;
+  p.flash = C.light.muzzleTime; // namlu parlaması etrafı aydınlatır
   Sound.shoot();
   for (let i = 0; i < 2; i++) addParticle({ x: bx, y: by, vx: Math.cos(p.angle + rand(-0.5, 0.5)) * rand(150, 300), vy: Math.sin(p.angle + rand(-0.5, 0.5)) * rand(150, 300), life: 0.12, max: 0.12, size: 2, color: '#ffe066', drag: 6, kind: 1 });
 }
@@ -1431,7 +1458,6 @@ function spawnZombie(type, x, y) {
     // sprite ve animasyon
     dk: 'z', sortY: y, face: x < player.x ? 1 : -1, animT: rand(0, TAU), // her zombi farklı zamanda zıplar
     sprite: type === 'tank' ? pick(ZPACK_TANK) : type === 'boss' ? ZPACK_BOSS : pick(ZPACK_NORMAL),
-    lift: t.hitLift, hitR: t.hitRadius,
   };
   if (isBoss) {
     z.state = 'chase'; z.timer = 0; z.dashCd = 3; z.dirX = 1; z.dirY = 0; z.enraged = false;
@@ -1489,6 +1515,7 @@ function updateZombies(dt) {
   for (const z of zombies) {
     if (z.dead) continue;
     z.hitFlash -= dt; z.bladeCd -= dt;
+    if (z.hp < z.maxHp * 0.6 && Math.random() < dt * C.effects.dripRate) addBloodDrip(z.x + rand(-6, 6), z.y + rand(-3, 2));
     const override = z.type === 'boss' ? updateBoss(z, dt) : null;
     if (override) { z.vx = override.vx; z.vy = override.vy; }
     else {
@@ -1541,11 +1568,12 @@ function separateZombies() {
   }
   for (const z of zombies) {
     if (z.dead) continue;
-    if (p.alive) {
-      const dx = z.x - p.x, dy = z.y - p.y, min = z.r + p.r, d2 = dx * dx + dy * dy;
+    if (p.alive) { // temas: zombi hitbox'ı ile oyuncu hitbox'ı (mermiyle aynı daireler)
+      const zh = zombieHitbox(z, _hz), ph = playerHitbox(p, _hp);
+      const dx = zh.x - ph.x, dy = zh.y - ph.y, min = zh.r + ph.r, d2 = dx * dx + dy * dy;
       if (d2 < (min + 2) * (min + 2)) {
         const d = Math.sqrt(d2) || 0.01;
-        if (d < min) { z.x = p.x + dx / d * min; z.y = p.y + dy / d * min; }
+        if (d < min) { const push = min - d; z.x += dx / d * push; z.y += dy / d * push; } // içine girmesin
         damagePlayer(z.damage * (z.state === 'dash' ? 1.5 : 1), z.x, z.y);
       }
     }
@@ -1556,11 +1584,12 @@ function separateZombies() {
 function hitZombie(z, dmg, dirx, diry, kbMul, isCrit, hx, hy) {
   if (z.dead) return;
   z.hp -= dmg; z.hitFlash = 0.09;
+  z.lastDx = dirx; z.lastDy = diry; // ölünce kan izi bu yöne uzar
   const kb = C.player.baseKnockback * kbMul / z.mass;
   z.kbx += dirx * kb; z.kby += diry * kb;
   spawnBlood(hx, hy, dirx, diry, isCrit ? 7 : 4, 200, false);
   Sound.play('hit', 0.045);
-  if (isCrit) addText(z.x + rand(-8, 8), z.y - z.lift * 2 - 6, Math.round(dmg) + '!', '#ffd43b', 18, 0.7);
+  if (isCrit) { const h = zombieHitbox(z, _hb2); addText(h.x + rand(-8, 8), h.y - h.r - 8, Math.round(dmg) + '!', '#ffd43b', 18, 0.7); }
   if (z.hp <= 0) killZombie(z);
 }
 
@@ -1570,18 +1599,20 @@ function killZombie(z) {
   score += z.score; kills++;
   const big = z.type === 'boss' ? 4 : z.type === 'tank' ? 1.6 : 1;
   Sound.play(z.type === 'boss' ? 'bossDeath' : 'death', z.type === 'boss' ? 0 : 0.06);
-  spawnBlood(z.x, z.y - z.lift, 0, 0, Math.round(14 * big), 260 * Math.sqrt(big), false);
+  const zh = zombieHitbox(z, _hb2), hx = zh.x, hy = zh.y;
+  spawnBlood(hx, hy, 0, 0, Math.round(14 * big), 260 * Math.sqrt(big), false);
   for (let i = 0; i < 5 * big; i++) {
     const a = rand(0, TAU), sp = rand(60, 220);
-    addParticle({ x: z.x, y: z.y - z.lift, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.8), max: 0.8, size: rand(2.5, 4.5) * Math.sqrt(big), color: z.skin, drag: 4, kind: 0 });
+    addParticle({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.8), max: 0.8, size: rand(2.5, 4.5) * Math.sqrt(big), color: z.skin, drag: 4, kind: 0 });
   }
-  addDecal(z.x, z.y, (z.r / 16));
+  addBloodSplat(z.x, z.y, z.lastDx || 0, z.lastDy || 0, z.r / 16); // yerde kalan, yavaşça kaybolan kan izi
   if (player.stats.lifesteal > 0 && player.alive) {
     healPlayer(player.stats.lifesteal);
     if (Math.random() < 0.35) addText(player.x + rand(-10, 10), player.y - 28, '+' + player.stats.lifesteal, '#69db7c', 14, 0.6);
   }
   if (z.type === 'boss') {
     shake = 22; wave.boss = null;
+    addLight(z.x, z.y - 60, 500, 0.8);
     addParticle({ x: z.x, y: z.y, vx: 0, vy: 0, life: 0.9, max: 0.9, size: 30, grow: 600, color: '#ff6b6b', drag: 0, kind: 2 });
     showBanner('DEV ZOMBİ YENİLDİ!', '+' + z.score + ' puan', 2.2, '#ffd43b');
   }
@@ -1592,14 +1623,51 @@ function explode(x, y, baseDmg, except) {
   const R = 50 + 16 * (lvl - 1), dmg = baseDmg * (0.35 + 0.15 * (lvl - 1));
   addParticle({ x, y, vx: 0, vy: 0, life: 0.25, max: 0.25, size: 6, grow: R * 4, color: '#ffa94d', drag: 0, kind: 2 });
   Sound.play('explode', 0.09);
+  addLight(x, y, R * 2.4, 0.2);
   for (let i = 0; i < 4; i++) { const a = rand(0, TAU), sp = rand(80, 220); addParticle({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.25, max: 0.25, size: 2, color: '#ffd43b', drag: 5, kind: 1 }); }
-  const list = zgQuery(x - R - 50, y - R - 50, x + R + 50, y + R + 120, _qc);
+  const list = zgQuery(x - R - 70, y - R - 70, x + R + 70, y + R + 170, _qc);
   for (const z of list) {
     if (z === except || z.dead) continue;
-    const dx = z.x - x, dy = z.y - z.lift - y, d = Math.hypot(dx, dy) || 1; // gövde merkezine göre
-    if (d < R + z.hitR) hitZombie(z, dmg, dx / d, dy / d, 0.6, false, z.x, z.y - z.lift);
+    const h = zombieHitbox(z, _hz), dx = h.x - x, dy = h.y - y, d = Math.hypot(dx, dy) || 1;
+    if (d < R + h.r) hitZombie(z, dmg, dx / d, dy / d, 0.6, false, h.x, h.y);
   }
 }
+
+/* =====================================================================
+   Hitbox'lar: her sprite'ın görünen (opak) piksellerinden önceden ölçüldü.
+   [x, y, r] sanat pikseli cinsinden, ayak noktasına göre: merkez = opak piksellerin
+   ortalaması, r = aynı alana sahip dairenin yarıçapı (şeffaf kenarlar sayılmaz).
+   Mermi isabeti, oyuncuya temas, bıçaklar ve patlamalar aynı hitbox'ı kullanır.
+   ===================================================================== */
+const HB_ZPACK = [[0,-13.3,10],[0,-13.8,10.28],[0,-13.2,10],[0,-13.1,10.08],[0,-13.1,10.11],[0,-13.4,10.19],[0,-13.7,10.4],[0,-13.1,10.09],
+  [0,-13.4,10.25],[0,-13.4,10.28],[0,-13.7,10.34],[0,-13.3,10.06],[0,-13.2,10.01],[0,-13.1,10.12],[0,-13.1,10.08],[0,-13.1,10.12],
+  [0,-14.2,10.7],[0,-13.1,10.11],[0,-13,9.93],[0,-13,10.09],[0,-13,10.09],[0,-13.1,10.12],[0,-13.1,10.11],[0,-13.5,10.37],
+  [0,-13,10.09],[0,-13,10.09],[0.1,-13.9,10.46],[0,-13.9,10.51],[0,-14.3,10.65],[0,-13.3,10.16],[0,-13,10.06],[0,-13.1,10.09],
+  [0,-14.1,10.59],[0,-13.1,10.09],[0,-13.1,10.08],[0,-13,10.06],[0,-13.9,10.17],[0,-13.1,10.01],[0,-14.2,10.7],[0,-13,10.08],
+  [0,-13.8,10.43],[0,-13.1,10.08],[0,-13.2,10.01],[0,-13,10.06],[0,-13.2,10.03],[0,-13.2,10.03],[0,-13,10.06],[0,-14.4,10.88],
+  [0,-13.2,9.97],[0,-13,9.93],[0,-13.1,9.9],[0,-14.9,10.88],[-0.1,-15.3,10.84],[0,-13.9,10.31],[0,-13.2,10.03],[0,-13.4,9.97],
+  [0,-13.2,9.98],[0,-13.3,10],[0,-13.8,10.19],[-0.1,-14,10.33],[0,-13.8,10.23],[0.2,-13.7,10.23],[0,-13.6,10.06],[0,-13.9,10.34]];
+const HB_RUNNER = [-0.4, -5.0, 5.14];  // Zombie1/2 ortalaması (sağa bakıyor)
+const HB_PLAYER = [-0.2, -7.6, 6.36];  // Player1-3 gövdesi, silah hariç (sola bakıyor)
+
+// Zombinin hitbox'ı (zıplama animasyonunu da takip eder)
+function zombieHitbox(z, out = {}) {
+  if (!imgOk(IMG.zpack)) { out.x = z.x; out.y = z.y; out.r = z.r; return out; } // yedek çizim: ayak dairesi
+  const sp = zombieSprite(z), hb = z.type === 'runner' ? HB_RUNNER : HB_ZPACK[z.sprite], a = zombieAnim(z);
+  out.x = z.x + z.face * hb[0] * sp.s;
+  out.y = z.y - a.bob + hb[1] * sp.s * a.sy;
+  out.r = hb[2] * sp.s * C.hitbox.scale;
+  return out;
+}
+function playerHitbox(p, out = {}) {
+  if (!imgOk(IMG.player1)) { out.x = p.x; out.y = p.y; out.r = p.r; return out; }
+  const s = C.sprites.player;
+  out.x = p.x + (playerFacingRight(p) ? -1 : 1) * HB_PLAYER[0] * s;
+  out.y = p.y + HB_PLAYER[1] * s;
+  out.r = HB_PLAYER[2] * s * C.hitbox.scale;
+  return out;
+}
+const _hz = {}, _hp = {}, _hb2 = {};
 
 /* =====================================================================
    Mermiler ve bıçaklar
@@ -1617,10 +1685,12 @@ function updateBullets(dt) {
       for (let k = 0; k < 3; k++) addParticle({ x: b.x, y: b.y, vx: -b.vx * rand(0.1, 0.3) + rand(-80, 80), vy: -b.vy * rand(0.1, 0.3) + rand(-80, 80), life: 0.2, max: 0.2, size: 2, color: '#ffe8a3', drag: 6, kind: 1 });
     }
     if (!dead) {
-      const list = zgQuery(Math.min(ox, b.x) - 44, Math.min(oy, b.y) - 4, Math.max(ox, b.x) + 44, Math.max(oy, b.y) + 110, _qb);
+      // hitbox ayakların üstünde olduğu için sorgu aşağı doğru genişletilir
+      const list = zgQuery(Math.min(ox, b.x) - 60, Math.min(oy, b.y) - 60, Math.max(ox, b.x) + 60, Math.max(oy, b.y) + 160, _qb);
       for (const z of list) {
         if (z.dead || b.hits.includes(z.id)) continue;
-        if (segCircle(ox, oy, b.x, b.y, z.x, z.y - z.lift, z.hitR + b.size)) {
+        const h = zombieHitbox(z, _hz);
+        if (segCircle(ox, oy, b.x, b.y, h.x, h.y, h.r + b.size)) {
           const dx = b.vx / b.speed, dy = b.vy / b.speed;
           b.hits.push(z.id);
           hitZombie(z, b.dmg, dx, dy, player.stats.knockback, b.crit, b.x, b.y);
@@ -1634,10 +1704,10 @@ function updateBullets(dt) {
 }
 
 function bladePositions() {
-  const p = player, n = p.stats.blades, out = [];
+  const p = player, n = p.stats.blades, out = [], c = playerHitbox(p, _hp);
   for (let k = 0; k < n; k++) {
     const a = p.bladeAngle + k * TAU / n;
-    out.push({ x: p.x + Math.cos(a) * C.player.bladeRadius, y: p.y + Math.sin(a) * C.player.bladeRadius, a });
+    out.push({ x: c.x + Math.cos(a) * C.player.bladeRadius, y: c.y + Math.sin(a) * C.player.bladeRadius, a });
   }
   return out;
 }
@@ -1645,13 +1715,13 @@ function updateBlades() {
   const p = player;
   if (!p.alive || p.stats.blades <= 0) return;
   const R = C.player.bladeRadius;
-  const list = zgQuery(p.x - R - 70, p.y - R - 70, p.x + R + 70, p.y + R + 70, _qd);
+  const list = zgQuery(p.x - R - 80, p.y - R - 100, p.x + R + 80, p.y + R + 160, _qd);
   const blades = bladePositions();
   for (const z of list) {
     if (z.dead || z.bladeCd > 0) continue;
     for (const b of blades) {
-      const dx = z.x - b.x, dy = z.y - b.y;
-      if (dx * dx + dy * dy < (z.r + 13) * (z.r + 13)) {
+      const h = zombieHitbox(z, _hz), dx = h.x - b.x, dy = h.y - b.y;
+      if (dx * dx + dy * dy < (h.r + 13) * (h.r + 13)) {
         const d = Math.hypot(z.x - p.x, z.y - p.y) || 1;
         z.bladeCd = C.player.bladeHitCooldown;
         hitZombie(z, C.player.bladeDamage * p.stats.damageMult, (z.x - p.x) / d, (z.y - p.y) / d, 0.8, false, b.x, b.y);
@@ -1673,12 +1743,27 @@ function spawnBlood(x, y, dx, dy, count, speed, omni) {
     addParticle({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.3, 0.7), max: 0.7, size: rand(1.5, 3.6), color: pick(BLOOD), drag: 5, kind: 0 });
   }
 }
-function addDecal(x, y, s) {
-  const blobs = [];
-  for (let i = 0; i < 4; i++) blobs.push([rand(-10, 10) * s, rand(-10, 10) * s, rand(5, 11) * s]);
-  decals.push({ x, y, blobs, life: C.effects.decalLife, max: C.effects.decalLife, c: pick(['#9c1016', '#8a0d12', '#a8141b']) });
-  if (decals.length > C.effects.maxDecals) decals.shift();
+const BLOOD_DECAL = ['#7e0d12', '#6e0a0f', '#8a1016'];
+function pushDecal(list, cap, x, y, blobs, life) {
+  list.push({ x, y, blobs, life, max: life, c: pick(BLOOD_DECAL) });
+  if (list.length > cap) list.shift();
 }
+// Ölen zombinin kan izi: gölet + vuruş yönüne uzanan damlalar. Yavaşça kaybolur.
+function addBloodSplat(x, y, dx, dy, s) {
+  const blobs = [];
+  for (let i = 0; i < 5; i++) blobs.push([rand(-9, 9) * s, rand(-5, 5) * s, rand(5, 10) * s]);
+  const n = randInt(4, 7), len = rand(30, 60) * s;
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    blobs.push([dx * len * t + rand(-4, 4) * s, dy * len * t * 0.7 + rand(-3, 3) * s, Math.max(1.5, (6 - 4 * t) * s * rand(0.7, 1.1))]);
+  }
+  pushDecal(decals, C.effects.maxDecals, x, y, blobs, C.effects.decalLife);
+}
+function addDecal(x, y, s) { addBloodSplat(x, y, 0, 0, s); }
+// Yaralı zombilerin arkasında kalan kan damlaları
+function addBloodDrip(x, y) { pushDecal(drips, C.effects.maxDrips, x, y, [[0, 0, rand(1.5, 3)]], C.effects.dripLife); }
+// Kısa süreli ışık (patlamalar)
+function addLight(x, y, r, life) { if (lights.length < 16) lights.push({ x, y, r, life, max: life }); }
 function addText(x, y, text, color, size, life) { texts.push({ x, y, text, color, size, life, max: life, vy: -60 }); }
 function showBanner(text, sub, dur, color) { banner = { text, sub: sub || '', t: 0, dur: dur || 2.2, color: color || '#ffffff' }; }
 
@@ -1691,7 +1776,9 @@ function updateEffects(dt) {
     if (p.drag) { const d = Math.exp(-p.drag * dt); p.vx *= d; p.vy *= d; }
     if (p.grow) p.size += p.grow * dt;
   }
-  for (let i = decals.length - 1; i >= 0; i--) { decals[i].life -= dt; if (decals[i].life <= 0) decals.splice(i, 1); }
+  for (const list of [decals, drips]) for (let i = list.length - 1; i >= 0; i--) { list[i].life -= dt; if (list[i].life <= 0) list.splice(i, 1); }
+  for (let i = lights.length - 1; i >= 0; i--) { lights[i].life -= dt; if (lights[i].life <= 0) lights.splice(i, 1); }
+  if (player) player.flash = Math.max(0, (player.flash || 0) - dt);
   for (let i = texts.length - 1; i >= 0; i--) {
     const t = texts[i]; t.life -= dt; t.y += t.vy * dt; t.vy *= Math.exp(-3 * dt);
     if (t.life <= 0) texts.splice(i, 1);
@@ -1840,11 +1927,11 @@ function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TA
 function line(x0, y0, x1, y1) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
 
 function drawDecals() {
-  for (const d of decals) {
-    if (!inView(d.x, d.y, 40)) continue;
-    ctx.globalAlpha = Math.min(1, d.life / 4) * 0.55;
+  for (const list of [drips, decals]) for (const d of list) {
+    if (!inView(d.x, d.y, 70)) continue;
+    ctx.globalAlpha = clamp(d.life / (d.max * 0.7), 0, 1) * 0.7; // ömrünün son %70'inde yavaşça solar
     ctx.fillStyle = d.c; ctx.beginPath();
-    for (const b of d.blobs) { ctx.moveTo(d.x + b[0] + b[2], d.y + b[1]); ctx.arc(d.x + b[0], d.y + b[1], b[2], 0, TAU); }
+    for (const b of d.blobs) { ctx.moveTo(d.x + b[0] + b[2], d.y + b[1]); ctx.ellipse(d.x + b[0], d.y + b[1], b[2], b[2] * 0.7, 0, 0, TAU); }
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -1975,7 +2062,8 @@ function drawBlades() {
   const p = player;
   if (!p.alive || p.stats.blades <= 0) return;
   ctx.strokeStyle = 'rgba(220,230,240,0.12)'; ctx.lineWidth = 16;
-  ctx.beginPath(); ctx.arc(p.x, p.y, C.player.bladeRadius, 0, TAU); ctx.stroke();
+  const c = playerHitbox(p, _hp);
+  ctx.beginPath(); ctx.arc(c.x, c.y, C.player.bladeRadius, 0, TAU); ctx.stroke();
   for (const b of bladePositions()) {
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a + Math.PI / 2);
     ctx.fillStyle = 'rgba(200,230,255,0.25)'; circle(0, 0, 14);
@@ -1985,9 +2073,9 @@ function drawBlades() {
     ctx.restore();
   }
 }
-function drawParticles() {
+function drawParticles(emissive) {
   for (const p of particles) {
-    if (!inView(p.x, p.y, p.size + 20)) continue;
+    if ((p.kind === 1 || p.kind === 2) !== emissive || !inView(p.x, p.y, p.size + 20)) continue;
     const a = clamp(p.life / p.max, 0, 1);
     ctx.globalAlpha = a;
     if (p.kind === 0) { ctx.fillStyle = p.color; circle(p.x, p.y, p.size * (0.5 + 0.5 * a)); }
@@ -2390,6 +2478,155 @@ function drawSticks() {
   }
 }
 
+/* =====================================================================
+   Karanlık atmosfer: ışık katmanı (fener + halka + namlu/patlama ışıkları),
+   sis, soğuk renk tonu, vinyet ve karanlıkta parlayan zombi gözleri
+   ===================================================================== */
+const lightCv = document.createElement('canvas'), lctx = lightCv.getContext('2d');
+// Işık katmanında karanlığı yumuşak kenarlı bir daire şeklinde aç
+function punchLight(g, x, y, r, strength) {
+  if (r <= 0 || strength <= 0) return;
+  const gr = g.createRadialGradient(x, y, 0, x, y, r);
+  gr.addColorStop(0, `rgba(0,0,0,${strength})`);
+  gr.addColorStop(0.55, `rgba(0,0,0,${strength * 0.8})`);
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+}
+function drawLighting(cx, cy) {
+  const L = C.light, dark = state === 'menu' ? L.menuDarkness : L.darkness;
+  if (dark <= 0) return;
+  const res = L.resolution, lw = Math.max(1, Math.ceil(W * res)), lh = Math.max(1, Math.ceil(H * res));
+  if (lightCv.width !== lw || lightCv.height !== lh) { lightCv.width = lw; lightCv.height = lh; }
+  const g = lctx;
+  g.globalCompositeOperation = 'source-over'; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, lw, lh);
+  g.globalAlpha = dark; g.fillStyle = `rgb(${L.color})`; g.fillRect(0, 0, lw, lh); g.globalAlpha = 1;
+  g.globalCompositeOperation = 'destination-out';
+  const k = viewScale * res;
+  g.setTransform(k, 0, 0, k, (W / 2 - cx * viewScale) * res, (H / 2 - cy * viewScale) * res);
+  const p = player;
+  if (p && p.alive && state !== 'menu') {
+    const fl = 1 - L.flicker * Math.random();
+    const c = playerHitbox(p, _hp);
+    punchLight(g, c.x, c.y, L.radius * fl, 1); // oyuncunun etrafındaki halka
+    // El feneri konisi: farklı genişlikte üst üste konilerle yumuşak kenar
+    const pv = gunPivot(p), a = p.angle, N = 6, range = L.coneRange * fl;
+    for (let i = 0; i < N; i++) {
+      const half = L.coneAngle * (1.35 - 0.65 * i / (N - 1));
+      const gr = g.createRadialGradient(pv.x, pv.y, 0, pv.x, pv.y, range);
+      gr.addColorStop(0, 'rgba(0,0,0,0.32)'); gr.addColorStop(0.65, 'rgba(0,0,0,0.24)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.beginPath(); g.moveTo(pv.x, pv.y); g.arc(pv.x, pv.y, range, a - half, a + half); g.closePath(); g.fill();
+    }
+    // Namlu parlaması etrafı kısa süre aydınlatır
+    if (p.flash > 0) { const m = gunMuzzle(p); punchLight(g, m.x, m.y, L.muzzleRadius * rand(0.85, 1), p.flash / L.muzzleTime); }
+  }
+  for (const l of lights) punchLight(g, l.x, l.y, l.r, l.life / l.max);
+  g.globalCompositeOperation = 'source-over';
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(lightCv, 0, 0, lw, lh, 0, 0, W, H);
+  ctx.restore();
+}
+// Soğuk ve soluk renkler: kısmi gri doygunluk + mavi-yeşil multiply
+function colorGrade() {
+  const L = C.light;
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (L.desaturate > 0) { ctx.globalCompositeOperation = 'saturation'; ctx.globalAlpha = L.desaturate; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, W, H); }
+  ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 1; ctx.fillStyle = L.tint; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+// Sis: döşenebilir bir doku iki katmanda yavaşça kayar
+let fogTex = null;
+function makeFog() {
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 26; i++) {
+    const x = rand(0, S), y = rand(0, S), r = rand(30, 90);
+    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { // kenarları dikişsiz
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      gr.addColorStop(0, 'rgba(205,220,228,0.5)'); gr.addColorStop(1, 'rgba(205,220,228,0)');
+      g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+    }
+  }
+  return c;
+}
+function drawFog() {
+  const L = C.light;
+  if (L.fogAlpha <= 0) return;
+  if (!fogTex) fogTex = makeFog();
+  const t = performance.now() / 1000;
+  ctx.save(); ctx.imageSmoothingEnabled = true;
+  for (const [scale, sp, al] of [[3, 1, 1], [5, -0.6, 0.7]]) {
+    const T = 256 * scale, ox = ((t * L.fogSpeed * sp) % T + T) % T, oy = ((t * L.fogSpeed * 0.4 * sp) % T + T) % T;
+    ctx.globalAlpha = L.fogAlpha * al;
+    const x0 = Math.floor((view.l - ox) / T) * T + ox, y0 = Math.floor((view.t - oy) / T) * T + oy;
+    for (let x = x0; x < view.r; x += T) for (let y = y0; y < view.b; y += T) ctx.drawImage(fogTex, x, y, T + 1, T + 1);
+  }
+  ctx.restore();
+}
+function drawAtmosVignette() {
+  const v = C.light.vignette;
+  if (v <= 0) return;
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) * 0.55);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${v})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+// Karanlıkta parlayan zombi gözleri (ışık katmanının üstüne, toplamalı çizilir)
+const glowCache = {};
+function glowSprite(rgb) {
+  if (glowCache[rgb]) return glowCache[rgb];
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(0.25, `rgba(${rgb},0.55)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+  return (glowCache[rgb] = c);
+}
+const EYES_ZPACK = [[12.5, 11.5], [18.5, 11.5]], EYES_RUNNER = [[7.5, 9.5]];
+function drawZombieEyes() {
+  const L = C.light;
+  if (L.eyeGlow <= 0 || !imgOk(IMG.zpack)) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const z of zombies) {
+    if (!inView(z.x, z.y - 40, z.r + 100)) continue;
+    const sp = zombieSprite(z), a = zombieAnim(z), cr = Math.cos(a.rot), sr = Math.sin(a.rot);
+    const glow = glowSprite(z.type === 'boss' ? '255,70,40' : '200,255,110');
+    const gs = sp.s * 4.2, flick = 0.85 + 0.15 * Math.sin(z.animT * 3 + z.id);
+    ctx.globalAlpha = L.eyeGlow * flick * (z.hitFlash > 0 ? 0.4 : 1);
+    for (const e of (z.type === 'runner' ? EYES_RUNNER : EYES_ZPACK)) {
+      const lx = (e[0] - sp.ax) * z.face * a.sx * sp.s, ly = (e[1] - sp.ay) * a.sy * sp.s;
+      const wx = z.x + lx * cr - ly * sr, wy = z.y - a.bob + lx * sr + ly * cr;
+      ctx.drawImage(glow, wx - gs / 2, wy - gs / 2, gs, gs);
+    }
+  }
+  ctx.restore();
+}
+// Namlu parlaması: karanlığın üstünde sıcak bir parıltı
+function drawMuzzleGlow() {
+  const p = player;
+  if (!p || !p.alive || !(p.flash > 0)) return;
+  const m = gunMuzzle(p), r = 70 * (0.8 + 0.4 * Math.random());
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5 * p.flash / C.light.muzzleTime;
+  ctx.drawImage(glowSprite('255,190,90'), m.x - r, m.y - r, r * 2, r * 2);
+  ctx.restore();
+}
+// H tuşu: hitbox debug görünümü
+function drawHitboxes() {
+  ctx.save(); ctx.lineWidth = 2 / viewScale;
+  for (const z of zombies) {
+    const h = zombieHitbox(z, _hz);
+    ctx.strokeStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#ff3b3b'; ctx.fillRect(h.x - 2, h.y - 2, 4, 4);
+    ctx.strokeStyle = 'rgba(255,220,60,0.6)'; ctx.setLineDash([4, 4]); // ayak (hareket) çarpışması
+    ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.5, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  }
+  if (player && player.alive) {
+    const h = playerHitbox(player, _hp);
+    ctx.strokeStyle = '#4dff6a'; ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.stroke();
+    if (player.stats.blades > 0) for (const b of bladePositions()) { ctx.beginPath(); ctx.arc(b.x, b.y, 13, 0, TAU); ctx.stroke(); }
+  }
+  ctx.strokeStyle = '#4dd2ff';
+  for (const b of bullets) { ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, TAU); ctx.stroke(); }
+  ctx.restore();
+}
+
 const drawList = [];
 function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2398,12 +2635,13 @@ function render() {
   const shx = shake > 0 ? rand(-shake, shake) : 0, shy = shake > 0 ? rand(-shake, shake) : 0;
   const cx = camX + shx / viewScale, cy = camY + shy / viewScale;
   const sc = viewScale * DPR;
-  ctx.setTransform(sc, 0, 0, sc, (W / 2 - cx * viewScale) * DPR, (H / 2 - cy * viewScale) * DPR);
+  const worldT = () => ctx.setTransform(sc, 0, 0, sc, (W / 2 - cx * viewScale) * DPR, (H / 2 - cy * viewScale) * DPR);
+  worldT();
   view.l = cx - W / 2 / viewScale; view.r = cx + W / 2 / viewScale; view.t = cy - H / 2 / viewScale; view.b = cy + H / 2 / viewScale;
 
+  // 1) Dünya
   drawGround();
   drawDecals();
-  // Görünür nesneleri topla, gölgeleri çiz, sonra Y'ye göre sıralayıp çiz
   drawList.length = 0;
   for (const o of world.statics) if (staticVisible(o)) drawList.push(o);
   if (player) {
@@ -2411,21 +2649,31 @@ function render() {
     if (player.alive) { player.sortY = player.y; drawList.push(player); }
   }
   for (const o of drawList) drawShadow(o);
-  if (player) drawBossTelegraph();
   drawList.sort((a, b) => a.sortY - b.sortY);
   for (const o of drawList) drawObject(o);
-  if (player) { drawBlades(); drawBullets(); }
-  drawParticles();
+  if (player) drawBlades();
+  drawParticles(false);
+  drawFog();
+  // 2) Soğuk renk tonu + karanlık ve ışıklar
+  colorGrade();
+  drawLighting(cx, cy);
+  // 3) Karanlıkta görünenler: uyarı alanı, gözler, mermiler, kıvılcımlar
+  worldT();
+  if (player) { drawBossTelegraph(); drawZombieEyes(); drawBullets(); drawMuzzleGlow(); }
+  drawParticles(true);
   if (player) drawZombieBars();
   drawTexts();
+  if (debugHitbox && player) drawHitboxes();
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawAtmosVignette();
   if (player && state !== 'menu') {
     drawVignette();
     drawEdgeArrows();
     drawHUD();
     drawSticks();
     drawBanner();
+    if (debugHitbox) hudText('HITBOX DEBUG (H) — kırmızı: zombi, yeşil: oyuncu, sarı: ayak çarpışması', 12 + safe.left, H - 16 - safe.bottom - (input.touchMode ? 150 : 0), 12, '#ffd43b', 'left', 800);
   }
 }
 
@@ -2443,7 +2691,7 @@ function newGame() {
   Sound.unlock();
   generateWorld();
   player = createPlayer();
-  zombies = []; bullets = []; particles = []; decals = []; texts = [];
+  zombies = []; bullets = []; particles = []; decals = []; drips = []; texts = []; lights = [];
   score = 0; kills = 0; playTime = 0; zombieId = 0; shake = 0; hitVignette = 0; banner = null;
   wave.num = 0; wave.queue = []; wave.active = false; wave.cleared = false; wave.boss = null;
   camX = player.x; camY = player.y; clampCamera();
@@ -2573,7 +2821,8 @@ window.ZD = {
   get state() { return state; }, get player() { return player; }, get zombies() { return zombies; },
   get wave() { return wave; }, get bullets() { return bullets; }, get score() { return score; },
   startWave, chooseUpgrade, openUpgrade, newGame, update, render, CONFIG,
-  get cards() { return currentCards; }, input, sticks, world,
+  get cards() { return currentCards; }, input, sticks, world, zombieHitbox, playerHitbox,
+  get debugHitbox() { return debugHitbox; }, set debugHitbox(v) { debugHitbox = v; },
 };
 </script>
 </body>
