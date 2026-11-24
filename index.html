@@ -1,0 +1,2112 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1d3319" />
+<title>Zombi Dalgası</title>
+<style>
+  :root { --font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #1d3319; color: #fff; font-family: var(--font);
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    touch-action: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none;
+  }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  /* Çentikli telefonlarda güvenli alanı okumak için görünmez eleman */
+  #safeProbe {
+    position: fixed; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* ---------- Ekran katmanları (menü, kart seçimi, duraklatma ...) ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10; display: none;
+    flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    background: radial-gradient(ellipse at center, rgba(10, 22, 10, .55), rgba(4, 10, 4, .9));
+    overflow-y: auto; touch-action: pan-y;
+  }
+  .overlay.show { display: flex; animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+  .title {
+    font-size: clamp(46px, 11vw, 112px); line-height: .9; margin: 0 0 12px; font-weight: 900; letter-spacing: 2px;
+    color: #9be15d; transform: rotate(-3deg);
+    text-shadow: 0 4px 0 #2e5a1a, 0 8px 0 #1a3510, 0 14px 30px rgba(0, 0, 0, .6);
+  }
+  .title span { color: #ff5a4f; text-shadow: 0 4px 0 #7a1712, 0 8px 0 #4a0d0a, 0 14px 30px rgba(0, 0, 0, .6); }
+  .tagline { font-size: 18px; opacity: .85; margin: 6px 0 22px; }
+  h2.big { font-size: clamp(34px, 7vw, 64px); margin: 0 0 8px; font-weight: 900; letter-spacing: 2px; text-shadow: 0 5px 0 rgba(0,0,0,.45); }
+  .sub { font-size: 17px; opacity: .85; margin: 0 0 6px; }
+  .best { font-size: 15px; opacity: .7; margin-top: 14px; }
+
+  .btn {
+    font-family: var(--font); font-size: 20px; font-weight: 800; color: #fff; letter-spacing: 1px;
+    background: linear-gradient(180deg, #5cc94a, #2f8f2a); border: none; border-radius: 14px;
+    padding: 13px 32px; margin: 6px; cursor: pointer;
+    box-shadow: 0 5px 0 #1d5e19, 0 10px 20px rgba(0, 0, 0, .4); transition: transform .1s, filter .1s;
+  }
+  .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #1d5e19; }
+  .btn.big { font-size: 28px; padding: 16px 60px; }
+  .btn.gray { background: linear-gradient(180deg, #6c7a89, #465462); box-shadow: 0 5px 0 #2b343d, 0 10px 20px rgba(0,0,0,.4); }
+  .btns { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+
+  .controls { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 24px; max-width: 760px; }
+  .controls .box {
+    background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .12); border-radius: 14px;
+    padding: 12px 18px; text-align: left; min-width: 260px;
+  }
+  .controls h3 { margin: 0 0 8px; font-size: 15px; color: #9be15d; letter-spacing: 1px; }
+  .controls p { margin: 5px 0; font-size: 14px; opacity: .92; }
+  .key {
+    display: inline-block; background: #eee; color: #222; border-radius: 5px; padding: 1px 7px;
+    font-weight: 800; font-size: 12px; box-shadow: 0 2px 0 #999; margin-right: 3px;
+  }
+
+  .stats { font-size: 20px; line-height: 1.7; margin: 10px 0 4px; background: rgba(0,0,0,.35); padding: 12px 28px; border-radius: 14px; }
+  .stats b { color: #ffd43b; }
+
+  /* ---------- Özellik kartları ---------- */
+  #cards { display: flex; gap: 18px; justify-content: center; align-items: stretch; flex-wrap: wrap; margin: 18px 0 8px; }
+  .card {
+    --rc: #b8c2cc; --rg: rgba(184, 194, 204, .25);
+    width: 215px; min-height: 285px; border-radius: 16px; padding: 16px 14px;
+    background: linear-gradient(180deg, #2b3542, #171d26);
+    border: 3px solid var(--rc);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), 0 12px 30px rgba(0, 0, 0, .5), 0 0 24px var(--rg);
+    cursor: pointer; display: flex; flex-direction: column; align-items: center;
+    transition: transform .15s, box-shadow .15s; animation: cardIn .4s backwards;
+  }
+  .card:nth-child(2) { animation-delay: .07s; }
+  .card:nth-child(3) { animation-delay: .14s; }
+  .card:hover { transform: translateY(-7px) scale(1.03); box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 16px 34px rgba(0,0,0,.55), 0 0 36px var(--rg); }
+  .card.rare { --rc: #4dabf7; --rg: rgba(77, 171, 247, .45); background: linear-gradient(180deg, #1d3557, #111c2e); }
+  .card.legendary { --rc: #ffc93c; --rg: rgba(255, 180, 40, .6); background: linear-gradient(180deg, #4a3510, #1f1606); animation: cardIn .4s backwards, legGlow 1.4s ease-in-out infinite alternate; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(30px) scale(.9); } to { opacity: 1; transform: none; } }
+  @keyframes legGlow { from { box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.5), 0 0 14px var(--rg); } to { box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.5), 0 0 40px var(--rg); } }
+  .card .ic { width: 88px; height: 88px; margin: 10px 0 8px; flex: none; }
+  .card .txt { display: flex; flex-direction: column; align-items: center; flex: 1; }
+  .card .rar { font-size: 12px; letter-spacing: 2px; font-weight: 900; color: var(--rc); }
+  .card .nm { font-size: 20px; font-weight: 800; margin-top: 2px; }
+  .card .ds { font-size: 14px; opacity: .88; margin-top: 8px; line-height: 1.35; }
+  .card .lv { margin-top: auto; padding-top: 10px; font-size: 12px; opacity: .65; }
+  .hint { font-size: 13px; opacity: .55; margin-top: 8px; }
+
+  /* Dar ekranlarda kartlar yatay şerit olur */
+  @media (max-width: 720px), (max-height: 520px) {
+    #cards { flex-direction: column; align-items: center; gap: 10px; width: 100%; margin: 10px 0 4px; }
+    .card { width: 100%; max-width: 460px; min-height: 0; flex-direction: row; text-align: left; padding: 10px 14px; gap: 12px; }
+    .card .ic { width: 62px; height: 62px; margin: 0; }
+    .card .txt { align-items: flex-start; }
+    .card .nm { font-size: 17px; }
+    .card .ds { font-size: 13px; margin-top: 3px; }
+    .card .lv { padding-top: 4px; margin-top: 2px; }
+    .card:hover { transform: scale(1.02); }
+    h2.big { font-size: 30px; }
+    .hint { display: none; }
+  }
+  @media (max-height: 520px) {
+    #cards { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+    .card { max-width: 290px; }
+    .card .ds { font-size: 12px; }
+    .controls { margin-top: 10px; }
+    .tagline { margin: 2px 0 10px; }
+  }
+
+  /* ---------- Duraklat butonu ---------- */
+  #btnPause {
+    position: fixed; z-index: 5; display: none; cursor: pointer; padding: 0;
+    top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right));
+    width: 44px; height: 44px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .45);
+  }
+  #btnPause::before, #btnPause::after { content: ''; position: absolute; top: 11px; width: 6px; height: 18px; background: #fff; border-radius: 2px; }
+  #btnPause::before { left: 12px; }
+  #btnPause::after { right: 12px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="safeProbe"></div>
+<button id="btnPause" aria-label="Duraklat"></button>
+
+<!-- Başlangıç ekranı -->
+<div id="menu" class="overlay show">
+  <h1 class="title">ZOMBİ<br><span>DALGASI</span></h1>
+  <p class="tagline">10 dalga boyunca hayatta kal, Dev Zombi'yi yen!</p>
+  <button id="btnStart" class="btn big">Başla</button>
+  <div class="controls">
+    <div class="box">
+      <h3>BİLGİSAYAR</h3>
+      <p><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> / ok tuşları: hareket</p>
+      <p><span class="key">Mouse</span> nişan al</p>
+      <p><span class="key">Sol tık</span> ateş (basılı tut: sürekli)</p>
+      <p><span class="key">ESC</span> / <span class="key">P</span> duraklat</p>
+    </div>
+    <div class="box">
+      <h3>TELEFON / TABLET</h3>
+      <p>Sol alt joystick: hareket</p>
+      <p>Sağ alt joystick: nişan al ve ateş et</p>
+      <p>Sağ üstteki <b>II</b> butonu: duraklat</p>
+      <p>Kartlara dokunarak özellik seç</p>
+    </div>
+  </div>
+  <div class="best" id="menuBest"></div>
+</div>
+
+<!-- Özellik seçim ekranı -->
+<div id="upgrade" class="overlay">
+  <h2 class="big" id="upTitle">Özellik Seç</h2>
+  <p class="sub" id="upSub"></p>
+  <div id="cards"></div>
+  <p class="hint">Klavyeden 1 / 2 / 3 tuşlarıyla da seçebilirsin</p>
+</div>
+
+<!-- Duraklatma ekranı -->
+<div id="pause" class="overlay">
+  <h2 class="big">DURAKLATILDI</h2>
+  <div class="btns">
+    <button id="btnResume" class="btn">Devam Et</button>
+    <button id="btnRestart" class="btn gray">Yeniden Başla</button>
+    <button id="btnMenu1" class="btn gray">Ana Menü</button>
+  </div>
+</div>
+
+<!-- Game Over ekranı -->
+<div id="gameover" class="overlay">
+  <h2 class="big" style="color:#ff5a4f">ÖLDÜN!</h2>
+  <p class="sub">Zombiler seni yakaladı...</p>
+  <div class="stats" id="goStats"></div>
+  <div class="btns">
+    <button id="btnRetry" class="btn big">Tekrar Oyna</button>
+    <button id="btnMenu2" class="btn gray">Ana Menü</button>
+  </div>
+</div>
+
+<!-- Kazanma ekranı -->
+<div id="win" class="overlay">
+  <h2 class="big" style="color:#ffd43b">TEBRİKLER!</h2>
+  <p class="sub">10 dalganın hepsini atlattın ve Dev Zombi'yi yendin!</p>
+  <div class="stats" id="winStats"></div>
+  <div class="btns">
+    <button id="btnWinRetry" class="btn big">Tekrar Oyna</button>
+    <button id="btnMenu3" class="btn gray">Ana Menü</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   CONFIG — Tüm denge değerleri burada. Oyunu buradan kolayca ayarlayabilirsin.
+   ===================================================================== */
+const CONFIG = {
+  world: {
+    width: 3000, height: 3000,   // harita boyutu (piksel)
+    safeRadius: 380,             // oyuncunun başladığı orta alanda engel olmayan yarıçap
+    edgeMargin: 100,             // harita kenarında engelsiz bırakılan şerit (zombiler buradan gelir)
+    obstacleGap: 100,            // engeller arasındaki en az boşluk (büyük zombiler de geçebilsin)
+    trees: 1.0,                  // ağaç yoğunluğu çarpanı
+    rocks: 45, fences: 14, signs: 12, bushes: 150, flowers: 120,
+  },
+  camera: {
+    followSharpness: 6,          // kameranın takip yumuşaklığı (büyük = daha sıkı)
+    viewWorldSize: 1100,         // ekranın uzun kenarında görünen dünya genişliği
+    minScale: 0.5, maxScale: 1.25,
+    edgeOverscroll: 110,
+    phoneShortSide: 440,         // telefonda kısa kenarda görünen en fazla dünya genişliği         // kamera harita dışını ne kadar gösterebilir
+  },
+  player: {
+    maxHp: 100,
+    speed: 220,                  // piksel/saniye
+    fireRate: 3,                 // saniyede atış
+    damage: 10,                  // mermi başı hasar
+    bulletSpeed: 850,
+    bulletRange: 700,
+    radius: 16,
+    invulnTime: 0.5,             // hasar sonrası ölümsüzlük (saniye)
+    critMultiplier: 2,           // kritik vuruş çarpanı
+    baseKnockback: 140,          // mermilerin temel geri tepme gücü
+    bladeDamage: 16, bladeRadius: 78, bladeSpeed: 3.4, bladeHitCooldown: 0.35,
+  },
+  zombies: {
+    //        can   hız  yarıçap hasar puan  kütle
+    normal: { hp: 30,  speed: 78,  radius: 16, damage: 10, score: 10,  mass: 1 },
+    runner: { hp: 16,  speed: 138, radius: 13, damage: 8,  score: 15,  mass: 0.7 },
+    tank:   { hp: 160, speed: 42,  radius: 27, damage: 22, score: 40,  mass: 3.5 },
+    boss: {
+      hp: 3200, speed: 64, radius: 50, damage: 30, score: 1000, mass: 25,
+      dashCooldownMin: 3.2, dashCooldownMax: 5.5, // atılma saldırıları arası süre
+      dashWindup: 0.8,                            // atılmadan önce uyarı süresi
+      dashSpeed: 600, dashDuration: 0.55, dashRange: 650, recoverTime: 0.6,
+    },
+  },
+  waves: {
+    total: 10,
+    counts: [10, 14, 18, 23, 28, 34, 40, 46, 53, 62], // her dalgadaki zombi sayısı
+    hpGrowth: 0.12,               // her dalgada zombi canı +%12
+    speedGrowth: 0.04,            // her dalgada zombi hızı +%4
+    spawnIntervalFirst: 1.15,     // 1. dalgada zombi doğma aralığı (sn)
+    spawnIntervalLast: 0.33,      // son dalgada zombi doğma aralığı (sn)
+    maxAlive: 45,                 // aynı anda en fazla canlı zombi (performans)
+    runnerFromWave: 4,            // koşucular 3. dalgadan SONRA çıkar
+    tankFromWave: 6,              // tanklar 5. dalgadan SONRA çıkar
+    runnerChance: 0.28, tankChance: 0.12,
+    bossSpawnAt: 0.25,            // boss son dalganın ne kadarı geçince gelsin (0-1)
+    startDelay: 2.0,              // "DALGA X" yazısından sonra ilk zombiye kadar süre
+    betweenWaveDelay: 1.8,        // dalga bitince kart ekranına kadar süre
+    healOnWaveClear: 10,          // dalga bitince iyileşme
+    clearBonus: 100,              // dalga bonus puanı (x dalga no)
+  },
+  upgrades: {
+    rarityWeights: { common: 60, rare: 30, legendary: 14 },
+  },
+  nav: { cell: 40, inflate: 14, losRange: 650, refresh: 0.25 },
+  effects: { maxParticles: 700, maxDecals: 140, decalLife: 25, shakeOnHit: 9 },
+};
+
+/* =====================================================================
+   Yardımcı fonksiyonlar
+   ===================================================================== */
+const C = CONFIG;
+const WW = C.world.width, WH = C.world.height;
+const TAU = Math.PI * 2;
+const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+function lerpAngle(a, b, t) { const d = ((b - a + Math.PI) % TAU + TAU) % TAU - Math.PI; return a + d * t; }
+function mulberry32(seed) { // küçük tohumlu rastgele sayı üreteci (zemin dokusu için)
+  let a = seed >>> 0;
+  return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+// Doğru parçası - çember kesişimi
+function segCircle(x0, y0, x1, y1, cx, cy, r) {
+  const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
+  let t = l2 > 0 ? ((cx - x0) * dx + (cy - y0) * dy) / l2 : 0;
+  t = clamp(t, 0, 1);
+  const px = x0 + dx * t - cx, py = y0 + dy * t - cy;
+  return px * px + py * py <= r * r;
+}
+// Yuvarlak köşeli dikdörtgen yolu
+function rr(g, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+function fmtTime(s) { s = Math.floor(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+const $ = id => document.getElementById(id);
+const FONT = '"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif';
+
+/* =====================================================================
+   Canvas ve ekran boyutu
+   ===================================================================== */
+const canvas = $('game');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1, viewScale = 1;
+const safe = { top: 0, right: 0, bottom: 0, left: 0 };
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  let vs = Math.max(W, H) / C.camera.viewWorldSize;
+  // Telefonlarda kısa kenar çok dar kalmasın: karakterler küçük görünmesin
+  if (Math.min(W, H) < 520) vs = Math.max(vs, Math.min(W, H) / C.camera.phoneShortSide);
+  viewScale = clamp(vs, C.camera.minScale, C.camera.maxScale);
+  const s = getComputedStyle($('safeProbe'));
+  safe.top = parseFloat(s.paddingTop) || 0; safe.right = parseFloat(s.paddingRight) || 0;
+  safe.bottom = parseFloat(s.paddingBottom) || 0; safe.left = parseFloat(s.paddingLeft) || 0;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+resize();
+
+/* =====================================================================
+   Oyun durumu
+   ===================================================================== */
+let state = 'menu'; // menu | upgrade | playing | paused | gameover | win
+let player = null;
+let zombies = [], bullets = [], particles = [], decals = [], texts = [];
+let score = 0, kills = 0, playTime = 0, zombieId = 0;
+let camX = WW / 2, camY = WH / 2, shake = 0, hitVignette = 0, menuTime = 0;
+let banner = null;
+const wave = { num: 0, queue: [], spawnTimer: 0, startDelay: 0, active: false, cleared: false, clearTimer: 0, boss: null };
+let bestScore = 0;
+try { bestScore = parseInt(localStorage.getItem('zombiDalgasi_best') || '0', 10) || 0; } catch (e) { /* depolama yok */ }
+function saveBest() {
+  if (score > bestScore) { bestScore = score; try { localStorage.setItem('zombiDalgasi_best', String(bestScore)); } catch (e) {} }
+}
+
+/* =====================================================================
+   Girdi: klavye, mouse, dokunmatik joystickler
+   ===================================================================== */
+const keys = new Set();
+const input = { mouseX: 0, mouseY: 0, mouseDown: false, touchMode: false, lastTouch: 0 };
+const STICK_R = 58;
+const sticks = {
+  move: { id: null, active: false, bx: 0, by: 0, kx: 0, ky: 0, vx: 0, vy: 0, mag: 0 },
+  aim:  { id: null, active: false, bx: 0, by: 0, kx: 0, ky: 0, vx: 0, vy: 0, mag: 0 },
+};
+input.touchMode = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+function releaseInputs() {
+  keys.clear(); input.mouseDown = false;
+  stickEnd(sticks.move); stickEnd(sticks.aim);
+}
+
+window.addEventListener('keydown', e => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  if (e.repeat && keys.has(e.code)) return;
+  keys.add(e.code);
+  if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
+  if (state === 'upgrade' && ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].includes(e.code)) {
+    const i = parseInt(e.code.slice(-1), 10) - 1;
+    if (currentCards[i]) chooseUpgrade(currentCards[i]);
+  }
+  if ((state === 'menu') && (e.code === 'Enter' || e.code === 'Space')) newGame();
+});
+window.addEventListener('keyup', e => keys.delete(e.code));
+window.addEventListener('blur', () => { releaseInputs(); if (state === 'playing') togglePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') togglePause(); });
+
+canvas.addEventListener('mousemove', e => {
+  input.mouseX = e.clientX; input.mouseY = e.clientY;
+  if (performance.now() - input.lastTouch > 1000) input.touchMode = false;
+});
+canvas.addEventListener('mousedown', e => {
+  if (performance.now() - input.lastTouch < 1000) return; // dokunmadan gelen sahte mouse olayı
+  input.touchMode = false;
+  input.mouseX = e.clientX; input.mouseY = e.clientY;
+  if (e.button === 0) input.mouseDown = true;
+});
+window.addEventListener('mouseup', e => { if (e.button === 0) input.mouseDown = false; });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// --- Dokunmatik joystickler ---
+function stickStart(st, t) {
+  st.id = t.identifier; st.active = true;
+  st.bx = clamp(t.clientX, STICK_R + 12, W - STICK_R - 12);
+  st.by = clamp(t.clientY, STICK_R + 12, H - STICK_R - 12);
+  st.kx = st.bx; st.ky = st.by; st.vx = st.vy = st.mag = 0;
+  stickMove(st, t);
+}
+function stickMove(st, t) {
+  let dx = t.clientX - st.bx, dy = t.clientY - st.by;
+  const d = Math.hypot(dx, dy);
+  if (d > STICK_R) { dx = dx / d * STICK_R; dy = dy / d * STICK_R; }
+  st.kx = st.bx + dx; st.ky = st.by + dy;
+  st.mag = Math.min(1, d / STICK_R);
+  st.vx = dx / STICK_R; st.vy = dy / STICK_R;
+}
+function stickEnd(st) { st.id = null; st.active = false; st.vx = st.vy = st.mag = 0; }
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  input.touchMode = true; input.lastTouch = performance.now(); input.mouseDown = false;
+  if (state !== 'playing') return;
+  for (const t of e.changedTouches) {
+    if (t.clientX < W / 2) { if (sticks.move.id === null) stickStart(sticks.move, t); }
+    else if (sticks.aim.id === null) stickStart(sticks.aim, t);
+  }
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault(); input.lastTouch = performance.now();
+  for (const t of e.changedTouches) {
+    if (t.identifier === sticks.move.id) stickMove(sticks.move, t);
+    else if (t.identifier === sticks.aim.id) stickMove(sticks.aim, t);
+  }
+}, { passive: false });
+function onTouchEnd(e) {
+  e.preventDefault(); input.lastTouch = performance.now();
+  for (const t of e.changedTouches) {
+    if (t.identifier === sticks.move.id) stickEnd(sticks.move);
+    else if (t.identifier === sticks.aim.id) stickEnd(sticks.aim);
+  }
+}
+canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+/* =====================================================================
+   Dünya: engeller (ağaç, kaya, çit) ve dekor (çalı, çiçek, tabela)
+   ===================================================================== */
+const world = {
+  obstacles: [], trees: [], rocks: [], fences: [], signs: [], bushes: [], flowers: [], patches: [], border: [],
+  seed: 1, chunks: [], chunkQueue: [],
+};
+const CHUNK = 500;
+const CHUNK_COLS = Math.ceil(WW / CHUNK), CHUNK_ROWS = Math.ceil(WH / CHUNK);
+
+const TREE_PALETTES = [
+  { dark: '#2d6a2e', mid: '#3e8a3a', light: '#5cab4b' },
+  { dark: '#27593a', mid: '#347748', light: '#4f985d' },
+  { dark: '#3b6a22', mid: '#4f8a2d', light: '#6eaa3f' },
+];
+const SIGN_TEXTS = ['TEHLİKE!', 'DİKKAT', 'KÖY →', '← ORMAN', 'KAÇ!', 'ÇIKIŞ YOK', 'ZOMBİ VAR', 'GERİ DÖN'];
+const FLOWER_COLORS = ['#ff6b9a', '#ffd43b', '#ffffff', '#b197fc', '#ff8787', '#74c0fc'];
+
+// Bir çember engel için yer uygun mu?
+function circleRectDist(cx, cy, o) {
+  const px = clamp(cx, o.x, o.x + o.w), py = clamp(cy, o.y, o.y + o.h);
+  return Math.hypot(cx - px, cy - py);
+}
+function canPlaceCircle(x, y, r) {
+  const m = C.world.edgeMargin;
+  if (x - r < m || y - r < m || x + r > WW - m || y + r > WH - m) return false;
+  if (Math.hypot(x - WW / 2, y - WH / 2) < C.world.safeRadius + r) return false;
+  const gap = C.world.obstacleGap;
+  for (const o of world.obstacles) {
+    if (o.shape === 'c') { if (Math.hypot(x - o.x, y - o.y) - o.r - r < gap) return false; }
+    else if (circleRectDist(x, y, o) - r < gap) return false;
+  }
+  return true;
+}
+function canPlaceRect(x, y, w, h) {
+  const m = C.world.edgeMargin;
+  if (x < m || y < m || x + w > WW - m || y + h > WH - m) return false;
+  const rect = { x, y, w, h };
+  if (circleRectDist(WW / 2, WH / 2, rect) < C.world.safeRadius) return false;
+  const gap = C.world.obstacleGap;
+  for (const o of world.obstacles) {
+    if (o.shape === 'c') { if (circleRectDist(o.x, o.y, rect) - o.r < gap) return false; }
+    else {
+      const dx = Math.max(0, Math.max(o.x - (x + w), x - (o.x + o.w)));
+      const dy = Math.max(0, Math.max(o.y - (y + h), y - (o.y + o.h)));
+      if (Math.hypot(dx, dy) < gap) return false;
+    }
+  }
+  return true;
+}
+function nearObstacle(x, y, r) {
+  for (const o of world.obstacles) {
+    if (o.shape === 'c') { if (Math.hypot(x - o.x, y - o.y) < o.r + r) return true; }
+    else if (circleRectDist(x, y, o) < r) return true;
+  }
+  return false;
+}
+
+function generateWorld() {
+  world.obstacles = []; world.trees = []; world.rocks = []; world.fences = []; world.signs = [];
+  world.bushes = []; world.flowers = []; world.patches = []; world.border = [];
+  world.seed = (Math.random() * 1e9) | 0;
+  // eski zemin parçalarını serbest bırak
+  for (const ch of world.chunks) if (ch) { ch.width = 0; ch.height = 0; }
+  world.chunks = new Array(CHUNK_COLS * CHUNK_ROWS).fill(null);
+  world.chunkQueue = [];
+  for (let i = 0; i < world.chunks.length; i++) world.chunkQueue.push(i);
+
+  // --- Çitler (önce büyük olanlar yerleşir) ---
+  for (let n = 0, tries = 0; n < C.world.fences && tries < 400; tries++) {
+    const horiz = Math.random() < 0.5, len = rand(140, 280), th = 12;
+    const w = horiz ? len : th, h = horiz ? th : len;
+    const x = rand(0, WW - w), y = rand(0, WH - h);
+    if (!canPlaceRect(x, y, w, h)) continue;
+    const f = { shape: 'r', kind: 'fence', x, y, w, h, horiz };
+    world.obstacles.push(f); world.fences.push(f); n++;
+  }
+  // --- Ağaçlar: dengeli dağılım için ızgara + rastgele kaydırma ---
+  const cell = 300;
+  for (let gx = 0; gx < WW / cell; gx++) for (let gy = 0; gy < WH / cell; gy++) {
+    const count = Math.random() < 0.3 * C.world.trees ? 2 : (Math.random() < C.world.trees ? 1 : 0);
+    for (let k = 0; k < count; k++) {
+      for (let t = 0; t < 10; t++) {
+        const x = gx * cell + rand(20, cell - 20), y = gy * cell + rand(20, cell - 20);
+        const cr = rand(40, 64), r = cr * 0.46;
+        if (!canPlaceCircle(x, y, r)) continue;
+        const blobs = [{ dx: 0, dy: 0, r: cr * 0.62 }];
+        const nb = randInt(5, 7), off = rand(0, TAU);
+        for (let b = 0; b < nb; b++) {
+          const a = off + b * TAU / nb + rand(-0.25, 0.25), dd = cr * rand(0.38, 0.5);
+          blobs.push({ dx: Math.cos(a) * dd, dy: Math.sin(a) * dd, r: cr * rand(0.42, 0.56) });
+        }
+        const tree = { shape: 'c', kind: 'tree', x, y, r, cr, blobs, pal: pick(TREE_PALETTES), alpha: 1 };
+        world.obstacles.push(tree); world.trees.push(tree);
+        break;
+      }
+    }
+  }
+  // --- Kayalar ---
+  for (let n = 0, tries = 0; n < C.world.rocks && tries < 2000; tries++) {
+    const x = rand(0, WW), y = rand(0, WH), r = rand(16, 32);
+    if (!canPlaceCircle(x, y, r)) continue;
+    const pts = [], np = randInt(7, 10);
+    for (let i = 0; i < np; i++) { const a = i / np * TAU; const d = r * rand(0.95, 1.25); pts.push([Math.cos(a) * d, Math.sin(a) * d]); }
+    const shade = randInt(0, 2);
+    const rock = { shape: 'c', kind: 'rock', x, y, r, pts,
+      c1: ['#8a8f96', '#7d838b', '#959aa0'][shade], c2: ['#a9aeb4', '#9ca2a9', '#b4b9be'][shade] };
+    world.obstacles.push(rock); world.rocks.push(rock); n++;
+  }
+  // --- Tahta tabelalar (dekor) ---
+  world.signs.push({ x: WW / 2 + 95, y: WH / 2 - 120, rot: -0.12, text: 'HAYATTA KAL!' });
+  for (let n = 0, tries = 0; n < C.world.signs && tries < 500; tries++) {
+    const x = rand(150, WW - 150), y = rand(150, WH - 150);
+    if (Math.hypot(x - WW / 2, y - WH / 2) < C.world.safeRadius) continue;
+    if (nearObstacle(x, y, 50)) continue;
+    world.signs.push({ x, y, rot: rand(-0.3, 0.3), text: pick(SIGN_TEXTS) }); n++;
+  }
+  // --- Çalılar (dekor, engel değil) ---
+  for (let n = 0, tries = 0; n < C.world.bushes && tries < 3000; tries++) {
+    const x = rand(30, WW - 30), y = rand(30, WH - 30), r = rand(14, 26);
+    if (Math.hypot(x - WW / 2, y - WH / 2) < C.world.safeRadius * 0.6) continue;
+    if (nearObstacle(x, y, r + 14)) continue;
+    const blobs = [];
+    const nb = randInt(3, 5);
+    for (let b = 0; b < nb; b++) { const a = rand(0, TAU), d = rand(0, r * 0.6); blobs.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d, r: r * rand(0.5, 0.75) }); }
+    const berries = Math.random() < 0.35 ? Array.from({ length: randInt(3, 6) }, () => ({ dx: rand(-r * 0.7, r * 0.7), dy: rand(-r * 0.7, r * 0.7) })) : null;
+    world.bushes.push({ x, y, r, blobs, berries, dark: pick(['#2f6f2c', '#326a34', '#3a7a2a']), light: pick(['#4f9a3e', '#58a548', '#4c9450']) });
+    n++;
+  }
+  // --- Çiçek öbekleri (zemine çizilir) ---
+  for (let n = 0; n < C.world.flowers; n++) {
+    const x = rand(40, WW - 40), y = rand(40, WH - 40);
+    if (nearObstacle(x, y, 30)) continue;
+    const col = pick(FLOWER_COLORS), fl = [];
+    const cnt = randInt(5, 10);
+    for (let i = 0; i < cnt; i++) fl.push({ dx: rand(-22, 22), dy: rand(-16, 16), c: Math.random() < 0.8 ? col : pick(FLOWER_COLORS) });
+    world.flowers.push({ x, y, fl });
+  }
+  // --- Zemin lekeleri (açık/koyu çimen, toprak) ---
+  for (let n = 0; n < 80; n++) {
+    world.patches.push({ x: rand(0, WW), y: rand(0, WH), r: rand(80, 230), c: Math.random() < 0.5 ? 'rgba(130,190,85,0.35)' : 'rgba(70,125,45,0.32)' });
+  }
+  for (let n = 0; n < 16; n++) world.patches.push({ x: rand(200, WW - 200), y: rand(200, WH - 200), r: rand(35, 85), c: 'rgba(140,115,70,0.38)' });
+  // --- Harita dışındaki sık orman sınırı ---
+  for (let x = -60; x <= WW + 60; x += 46) {
+    world.border.push({ x: x + rand(-8, 8), y: -rand(18, 45), r: rand(34, 54) });
+    world.border.push({ x: x + rand(-8, 8), y: WH + rand(18, 45), r: rand(34, 54) });
+  }
+  for (let y = -60; y <= WH + 60; y += 46) {
+    world.border.push({ x: -rand(18, 45), y: y + rand(-8, 8), r: rand(34, 54) });
+    world.border.push({ x: WW + rand(18, 45), y: y + rand(-8, 8), r: rand(34, 54) });
+  }
+
+  buildObstacleGrid();
+  buildNav();
+  zgInit();
+}
+
+/* ---------- Zemin, 500x500'lük parçalar halinde önceden çizilir (performans) ---------- */
+function renderChunk(ci, cj) {
+  const c = document.createElement('canvas');
+  c.width = CHUNK + 2; c.height = CHUNK + 2;
+  const g = c.getContext('2d');
+  const ox = ci * CHUNK, oy = cj * CHUNK;
+  g.translate(-ox + 1, -oy + 1);
+  g.fillStyle = '#62a043';
+  g.fillRect(ox - 1, oy - 1, CHUNK + 2, CHUNK + 2);
+  // yumuşak lekeler
+  for (const p of world.patches) {
+    if (p.x + p.r < ox || p.x - p.r > ox + CHUNK || p.y + p.r < oy || p.y - p.r > oy + CHUNK) continue;
+    const gr = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    gr.addColorStop(0, p.c); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(p.x, p.y, p.r, 0, TAU); g.fill();
+  }
+  // çimen çizgileri (renk başına tek yol = hızlı)
+  const rng = mulberry32(world.seed ^ (ci * 73856093) ^ (cj * 19349663));
+  const cols = ['#4f8a33', '#76b651', '#88c45f', '#5a9a3a'];
+  g.lineWidth = 1.4; g.lineCap = 'round';
+  for (let k = 0; k < cols.length; k++) {
+    g.strokeStyle = cols[k]; g.beginPath();
+    for (let i = 0; i < 260; i++) {
+      const x = ox + 4 + rng() * (CHUNK - 8), y = oy + 8 + rng() * (CHUNK - 12);
+      const h = 3 + rng() * 5;
+      g.moveTo(x, y); g.lineTo(x - 1.5, y - h);
+      g.moveTo(x + 2, y); g.lineTo(x + 3, y - h * 0.8);
+    }
+    g.stroke();
+  }
+  // küçük noktalar
+  g.fillStyle = 'rgba(40,80,25,0.25)';
+  for (let i = 0; i < 160; i++) g.fillRect(ox + rng() * CHUNK, oy + rng() * CHUNK, 2, 2);
+  // çiçekler
+  for (const f of world.flowers) {
+    if (f.x + 30 < ox || f.x - 30 > ox + CHUNK || f.y + 30 < oy || f.y - 30 > oy + CHUNK) continue;
+    for (const p of f.fl) {
+      const x = f.x + p.dx, y = f.y + p.dy;
+      g.strokeStyle = '#3f7a2a'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y + 5); g.stroke();
+      g.fillStyle = p.c; g.beginPath();
+      for (let a = 0; a < 5; a++) { const an = a / 5 * TAU; g.moveTo(x + Math.cos(an) * 2.4 + 1.9, y + Math.sin(an) * 2.4); g.arc(x + Math.cos(an) * 2.4, y + Math.sin(an) * 2.4, 1.9, 0, TAU); }
+      g.fill();
+      g.fillStyle = '#ffcf3f'; g.beginPath(); g.arc(x, y, 1.4, 0, TAU); g.fill();
+    }
+  }
+  // harita kenarına doğru kararma
+  const ed = 90;
+  const edge = (x0, y0, x1, y1, rx, ry, rw, rh) => {
+    const gr = g.createLinearGradient(x0, y0, x1, y1);
+    gr.addColorStop(0, 'rgba(10,30,8,0.5)'); gr.addColorStop(1, 'rgba(10,30,8,0)');
+    g.fillStyle = gr; g.fillRect(rx, ry, rw, rh);
+  };
+  if (ox === 0) edge(0, 0, ed, 0, 0, oy - 1, ed, CHUNK + 2);
+  if (oy === 0) edge(0, 0, 0, ed, ox - 1, 0, CHUNK + 2, ed);
+  if (ox + CHUNK >= WW) edge(WW, 0, WW - ed, 0, WW - ed, oy - 1, ed, CHUNK + 2);
+  if (oy + CHUNK >= WH) edge(0, WH, 0, WH - ed, ox - 1, WH - ed, CHUNK + 2, ed);
+  return c;
+}
+function getChunk(i, j) {
+  const idx = j * CHUNK_COLS + i;
+  if (!world.chunks[idx]) world.chunks[idx] = renderChunk(i, j);
+  return world.chunks[idx];
+}
+
+/* =====================================================================
+   Çarpışma: engeller için sabit ızgara, zombiler için her kare yenilenen ızgara
+   ===================================================================== */
+const OB_CELL = 150;
+let obCols = 0, obRows = 0, obCells = [], obStamp = 0;
+const _qo = [];
+function buildObstacleGrid() {
+  obCols = Math.ceil(WW / OB_CELL); obRows = Math.ceil(WH / OB_CELL);
+  obCells = Array.from({ length: obCols * obRows }, () => []);
+  for (const o of world.obstacles) {
+    o.stamp = 0;
+    const x0 = o.shape === 'c' ? o.x - o.r : o.x, y0 = o.shape === 'c' ? o.y - o.r : o.y;
+    const x1 = o.shape === 'c' ? o.x + o.r : o.x + o.w, y1 = o.shape === 'c' ? o.y + o.r : o.y + o.h;
+    for (let i = clamp(Math.floor(x0 / OB_CELL), 0, obCols - 1); i <= clamp(Math.floor(x1 / OB_CELL), 0, obCols - 1); i++)
+      for (let j = clamp(Math.floor(y0 / OB_CELL), 0, obRows - 1); j <= clamp(Math.floor(y1 / OB_CELL), 0, obRows - 1); j++)
+        obCells[j * obCols + i].push(o);
+  }
+}
+function obQuery(x0, y0, x1, y1) {
+  _qo.length = 0; obStamp++;
+  const i0 = clamp(Math.floor(x0 / OB_CELL), 0, obCols - 1), i1 = clamp(Math.floor(x1 / OB_CELL), 0, obCols - 1);
+  const j0 = clamp(Math.floor(y0 / OB_CELL), 0, obRows - 1), j1 = clamp(Math.floor(y1 / OB_CELL), 0, obRows - 1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const cell = obCells[j * obCols + i];
+    for (let k = 0; k < cell.length; k++) { const o = cell[k]; if (o.stamp !== obStamp) { o.stamp = obStamp; _qo.push(o); } }
+  }
+  return _qo;
+}
+// Nokta engellerin içinde mi? (inflate: engeli ne kadar büyütelim)
+function pointInObstacles(x, y, inflate) {
+  const list = obQuery(x - inflate, y - inflate, x + inflate, y + inflate);
+  for (const o of list) {
+    if (o.shape === 'c') { const dx = x - o.x, dy = y - o.y, r = o.r + inflate; if (dx * dx + dy * dy < r * r) return true; }
+    else {
+      const dx = x - clamp(x, o.x, o.x + o.w), dy = y - clamp(y, o.y, o.y + o.h);
+      if (dx * dx + dy * dy <= inflate * inflate) return true;
+    }
+  }
+  return false;
+}
+// Yuvarlak bir varlığı engellerin dışına it. Çarpışma olduysa true döner.
+function resolveStatic(e) {
+  let hit = false;
+  const list = obQuery(e.x - e.r, e.y - e.r, e.x + e.r, e.y + e.r);
+  for (const o of list) {
+    if (o.shape === 'c') {
+      const dx = e.x - o.x, dy = e.y - o.y, min = e.r + o.r, d2 = dx * dx + dy * dy;
+      if (d2 < min * min) {
+        const d = Math.sqrt(d2) || 0.01, push = min - d;
+        e.x += dx / d * push; e.y += dy / d * push; hit = true;
+      }
+    } else {
+      const cx = clamp(e.x, o.x, o.x + o.w), cy = clamp(e.y, o.y, o.y + o.h);
+      const dx = e.x - cx, dy = e.y - cy, d2 = dx * dx + dy * dy;
+      if (d2 < e.r * e.r) {
+        hit = true;
+        if (d2 > 0.0001) { const d = Math.sqrt(d2), push = e.r - d; e.x += dx / d * push; e.y += dy / d * push; }
+        else { // merkez dikdörtgenin içindeyse en kısa yönden dışarı çıkar
+          const l = e.x - o.x, r = o.x + o.w - e.x, t = e.y - o.y, b = o.y + o.h - e.y, m = Math.min(l, r, t, b);
+          if (m === l) e.x = o.x - e.r; else if (m === r) e.x = o.x + o.w + e.r; else if (m === t) e.y = o.y - e.r; else e.y = o.y + o.h + e.r;
+        }
+      }
+    }
+  }
+  return hit;
+}
+function clampBounds(e) { e.x = clamp(e.x, e.r, WW - e.r); e.y = clamp(e.y, e.r, WH - e.r); }
+function segmentHitsObstacle(x0, y0, x1, y1) {
+  const d = Math.hypot(x1 - x0, y1 - y0), steps = Math.max(1, Math.ceil(d / 8));
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    if (pointInObstacles(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 0)) return true;
+  }
+  return false;
+}
+
+// --- Zombi uzamsal ızgarası ---
+const ZG_CELL = 80;
+let zgCols = 0, zgRows = 0, zgCells = [], zgUsed = [], zStamp = 0;
+function zgInit() {
+  zgCols = Math.ceil(WW / ZG_CELL); zgRows = Math.ceil(WH / ZG_CELL);
+  zgCells = Array.from({ length: zgCols * zgRows }, () => []); zgUsed = [];
+}
+function zgBuild() {
+  for (const idx of zgUsed) zgCells[idx].length = 0;
+  zgUsed.length = 0;
+  for (const z of zombies) {
+    if (z.dead) continue;
+    const i0 = clamp(Math.floor((z.x - z.r) / ZG_CELL), 0, zgCols - 1), i1 = clamp(Math.floor((z.x + z.r) / ZG_CELL), 0, zgCols - 1);
+    const j0 = clamp(Math.floor((z.y - z.r) / ZG_CELL), 0, zgRows - 1), j1 = clamp(Math.floor((z.y + z.r) / ZG_CELL), 0, zgRows - 1);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const idx = j * zgCols + i, cell = zgCells[idx];
+      if (cell.length === 0) zgUsed.push(idx);
+      cell.push(z);
+    }
+  }
+}
+function zgQuery(x0, y0, x1, y1, out) {
+  out.length = 0; zStamp++;
+  const i0 = clamp(Math.floor(x0 / ZG_CELL), 0, zgCols - 1), i1 = clamp(Math.floor(x1 / ZG_CELL), 0, zgCols - 1);
+  const j0 = clamp(Math.floor(y0 / ZG_CELL), 0, zgRows - 1), j1 = clamp(Math.floor(y1 / ZG_CELL), 0, zgRows - 1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const cell = zgCells[j * zgCols + i];
+    for (let k = 0; k < cell.length; k++) { const z = cell[k]; if (z.stamp !== zStamp && !z.dead) { z.stamp = zStamp; out.push(z); } }
+  }
+  return out;
+}
+const _qa = [], _qb = [], _qc = [], _qd = [];
+
+/* =====================================================================
+   Yol bulma: oyuncudan dışa doğru akış alanı (Dijkstra). Zombiler engellerin
+   etrafından dolaşmak için en düşük mesafeli komşu hücreye yürür.
+   ===================================================================== */
+const NAV = C.nav.cell;
+let navCols = 0, navRows = 0, navBlocked = null, navDist = null, heapIdx = null, heapCost = null, heapSize = 0;
+let navTimer = 0, navLastCell = -1;
+const NDX = [1, -1, 0, 0, 1, 1, -1, -1], NDY = [0, 0, 1, -1, 1, -1, 1, -1];
+const NCOST = [1, 1, 1, 1, Math.SQRT2, Math.SQRT2, Math.SQRT2, Math.SQRT2];
+function buildNav() {
+  navCols = Math.ceil(WW / NAV); navRows = Math.ceil(WH / NAV);
+  const n = navCols * navRows;
+  navBlocked = new Uint8Array(n); navDist = new Float32Array(n);
+  heapIdx = new Int32Array(n * 8 + 8); heapCost = new Float32Array(n * 8 + 8);
+  for (let j = 0; j < navRows; j++) for (let i = 0; i < navCols; i++)
+    navBlocked[j * navCols + i] = pointInObstacles((i + 0.5) * NAV, (j + 0.5) * NAV, C.nav.inflate) ? 1 : 0;
+  navLastCell = -1;
+}
+function heapPush(i, c) {
+  let k = heapSize++;
+  while (k > 0) { const p = (k - 1) >> 1; if (heapCost[p] <= c) break; heapIdx[k] = heapIdx[p]; heapCost[k] = heapCost[p]; k = p; }
+  heapIdx[k] = i; heapCost[k] = c;
+}
+function heapPop() {
+  const top = heapIdx[0];
+  heapSize--;
+  const li = heapIdx[heapSize], lc = heapCost[heapSize];
+  let k = 0;
+  while (true) {
+    const l = 2 * k + 1; if (l >= heapSize) break;
+    const r = l + 1, m = (r < heapSize && heapCost[r] < heapCost[l]) ? r : l;
+    if (heapCost[m] >= lc) break;
+    heapIdx[k] = heapIdx[m]; heapCost[k] = heapCost[m]; k = m;
+  }
+  heapIdx[k] = li; heapCost[k] = lc;
+  return top;
+}
+function navCellOf(x, y) { return clamp(Math.floor(y / NAV), 0, navRows - 1) * navCols + clamp(Math.floor(x / NAV), 0, navCols - 1); }
+function computeFlow(px, py) {
+  navDist.fill(Infinity); heapSize = 0;
+  const s = navCellOf(px, py);
+  navDist[s] = 0; heapPush(s, 0);
+  while (heapSize > 0) {
+    const c = heapCost[0], i = heapPop();
+    if (c > navDist[i]) continue;
+    const ci = i % navCols, cj = (i / navCols) | 0;
+    for (let k = 0; k < 8; k++) {
+      const nx = ci + NDX[k], ny = cj + NDY[k];
+      if (nx < 0 || ny < 0 || nx >= navCols || ny >= navRows) continue;
+      const ni = ny * navCols + nx;
+      if (navBlocked[ni]) continue;
+      if (k >= 4 && (navBlocked[cj * navCols + nx] || navBlocked[ny * navCols + ci])) continue; // köşe kesme yok
+      const nc = c + NCOST[k];
+      if (nc < navDist[ni]) { navDist[ni] = nc; heapPush(ni, nc); }
+    }
+  }
+}
+// Zombinin bir sonraki hedef noktasını akış alanından bulur (z.tx, z.ty). Bulamazsa false.
+function flowTarget(z) {
+  const ci = clamp(Math.floor(z.x / NAV), 0, navCols - 1), cj = clamp(Math.floor(z.y / NAV), 0, navRows - 1);
+  let best = -1, bestD = navDist[cj * navCols + ci];
+  for (let k = 0; k < 8; k++) {
+    const nx = ci + NDX[k], ny = cj + NDY[k];
+    if (nx < 0 || ny < 0 || nx >= navCols || ny >= navRows) continue;
+    const ni = ny * navCols + nx;
+    if (navBlocked[ni]) continue;
+    if (k >= 4 && (navBlocked[cj * navCols + nx] || navBlocked[ny * navCols + ci])) continue;
+    if (navDist[ni] < bestD) { bestD = navDist[ni]; best = ni; }
+  }
+  if (best < 0) return false;
+  z.tx = (best % navCols + 0.5) * NAV; z.ty = (((best / navCols) | 0) + 0.5) * NAV;
+  return true;
+}
+// İki nokta arasında engel var mı? (kaba ama hızlı görüş kontrolü)
+function navLOS(x0, y0, x1, y1) {
+  const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
+  const steps = Math.ceil(d / 20), start = navCellOf(x0, y0), end = navCellOf(x1, y1);
+  for (let i = 1; i < steps; i++) {
+    const c = navCellOf(x0 + dx * i / steps, y0 + dy * i / steps);
+    if (c !== start && c !== end && navBlocked[c]) return false;
+  }
+  return true;
+}
+
+/* =====================================================================
+   Özellikler (yükseltmeler)
+   ===================================================================== */
+const RARITY = {
+  common:    { label: 'SIRADAN',  color: '#b8c2cc', bg: '#3a4552' },
+  rare:      { label: 'NADİR',    color: '#4dabf7', bg: '#1d4370' },
+  legendary: { label: 'EFSANEVİ', color: '#ffc93c', bg: '#6b4a0c' },
+};
+const UPGRADES = [
+  { id: 'damage',    name: 'Güçlü Mermi',      rarity: 'common',    max: 10, desc: () => '+%25 mermi hasarı',                              apply: s => { s.damageMult += 0.25; } },
+  { id: 'speed',     name: 'Çevik Adımlar',    rarity: 'common',    max: 6,  desc: () => '+%15 hareket hızı',                              apply: s => { s.speedMult += 0.15; } },
+  { id: 'firerate',  name: 'Seri Atış',        rarity: 'common',    max: 8,  desc: () => '+%20 atış hızı',                                 apply: s => { s.fireRateMult += 0.2; } },
+  { id: 'maxhp',     name: 'Sağlam Beden',     rarity: 'common',    max: 10, desc: () => '+30 maksimum can ve 30 iyileşme',                apply: (s, p) => { p.maxHp += 30; healPlayer(30); } },
+  { id: 'regen',     name: 'Yenilenme',        rarity: 'common',    max: 8,  desc: () => 'Saniyede +1 can yenilenir',                      apply: s => { s.regen += 1; } },
+  { id: 'knockback', name: 'Sarsıcı Mermi',    rarity: 'common',    max: 5,  desc: () => 'Mermiler zombileri çok daha fazla geri iter',     apply: s => { s.knockback += 1.2; } },
+  { id: 'velocity',  name: 'Hızlı Mermi',      rarity: 'common',    max: 5,  desc: () => '+%20 mermi hızı ve menzili',                     apply: s => { s.velocityMult += 0.2; } },
+  { id: 'double',    name: 'Çift Mermi',       rarity: 'rare',      max: 3,  desc: () => 'Her atışta +1 paralel mermi',                    apply: s => { s.parallel += 1; } },
+  { id: 'spread',    name: 'Yayılma Atışı',    rarity: 'rare',      max: 3,  desc: lv => lv === 0 ? 'Üçlü yayılma: mermiler 3 yöne gider' : 'Yayılmaya +2 mermi daha', apply: s => { s.spread += 1; } },
+  { id: 'pierce',    name: 'Delici Mermi',     rarity: 'rare',      max: 5,  desc: () => 'Mermi +1 zombinin içinden daha geçer',           apply: s => { s.pierce += 1; } },
+  { id: 'crit',      name: 'Kritik Vuruş',     rarity: 'rare',      max: 6,  desc: () => '+%10 kritik şansı (2x hasar)',                   apply: s => { s.crit += 0.10; } },
+  { id: 'lifesteal', name: 'Vampir',           rarity: 'rare',      max: 5,  desc: () => 'Öldürdüğün her zombi +2 can verir',              apply: s => { s.lifesteal += 2; } },
+  { id: 'blades',    name: 'Koruyucu Bıçaklar', rarity: 'legendary', max: 6, desc: () => 'Etrafında dönen +1 keskin bıçak',                apply: s => { s.blades += 1; } },
+  { id: 'explosive', name: 'Patlayıcı Mermi',  rarity: 'legendary', max: 3,  desc: () => 'Mermiler isabet edince patlayıp çevreye hasar verir', apply: s => { s.explosive += 1; } },
+  { id: 'revive',    name: 'İkinci Şans',      rarity: 'legendary', max: 2,  desc: () => 'Ölünce bir kez %50 canla dirilirsin',            apply: s => { s.revives += 1; } },
+];
+const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
+
+// Ağırlıklı rastgele 3 farklı özellik seç
+function rollUpgrades() {
+  const pool = UPGRADES.filter(u => (player.levels[u.id] || 0) < u.max);
+  const picks = [];
+  while (picks.length < 3 && pool.length) {
+    let total = 0;
+    for (const u of pool) total += C.upgrades.rarityWeights[u.rarity];
+    let r = Math.random() * total, idx = 0;
+    for (; idx < pool.length; idx++) { r -= C.upgrades.rarityWeights[pool[idx].rarity]; if (r <= 0) break; }
+    idx = Math.min(idx, pool.length - 1);
+    picks.push(pool[idx]); pool.splice(idx, 1);
+  }
+  return picks;
+}
+
+/* ---------- Özellik simgeleri: hepsi kodla çizilir (100x100 koordinat) ---------- */
+function bulletShape(g, x, y, w, h, rot, body = '#e0b04a', tip = '#c0703a') {
+  g.save(); g.translate(x, y); g.rotate(rot);
+  g.fillStyle = body;
+  g.beginPath(); g.moveTo(-w / 2, h / 2); g.lineTo(-w / 2, -h / 2 + w * 0.7);
+  g.arc(0, -h / 2 + w * 0.7, w / 2, Math.PI, 0); g.lineTo(w / 2, h / 2); g.closePath(); g.fill();
+  g.fillStyle = tip;
+  g.beginPath(); g.moveTo(-w / 2, -h / 2 + w * 1.1); g.lineTo(-w / 2, -h / 2 + w * 0.7);
+  g.arc(0, -h / 2 + w * 0.7, w / 2, Math.PI, 0); g.lineTo(w / 2, -h / 2 + w * 1.1); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(-w / 2, h / 2 - w * 0.45, w, w * 0.25);
+  g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(-w / 2 + w * 0.15, -h / 2 + w * 0.9, w * 0.18, h * 0.6);
+  g.restore();
+}
+function heartPath(g, cx, cy, s) {
+  g.beginPath();
+  g.moveTo(cx, cy + 36 * s);
+  g.bezierCurveTo(cx - 30 * s, cy + 14 * s, cx - 42 * s, cy - 6 * s, cx - 36 * s, cy - 20 * s);
+  g.bezierCurveTo(cx - 28 * s, cy - 38 * s, cx - 6 * s, cy - 36 * s, cx, cy - 20 * s);
+  g.bezierCurveTo(cx + 6 * s, cy - 36 * s, cx + 28 * s, cy - 38 * s, cx + 36 * s, cy - 20 * s);
+  g.bezierCurveTo(cx + 42 * s, cy - 6 * s, cx + 30 * s, cy + 14 * s, cx, cy + 36 * s);
+  g.closePath();
+}
+function starPath(g, cx, cy, n, ro, ri, rot = 0) {
+  g.beginPath();
+  for (let i = 0; i < n * 2; i++) { const a = rot + i * Math.PI / n, r = i % 2 ? ri : ro; const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.closePath();
+}
+function drawIcon(g, id, x, y, size) {
+  g.save(); g.translate(x, y); g.scale(size / 100, size / 100);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  switch (id) {
+    case 'damage':
+      g.fillStyle = '#ff5b2e'; starPath(g, 50, 50, 9, 46, 28, 0.2); g.fill();
+      g.fillStyle = '#ffb02e'; starPath(g, 50, 50, 9, 34, 21, 0.4); g.fill();
+      bulletShape(g, 50, 50, 16, 46, 0.6);
+      break;
+    case 'speed':
+      for (let i = 0; i < 3; i++) {
+        g.strokeStyle = `rgba(79,209,255,${0.45 + i * 0.27})`; g.lineWidth = 11;
+        g.beginPath(); g.moveTo(22 + i * 19, 24); g.lineTo(44 + i * 19, 50); g.lineTo(22 + i * 19, 76); g.stroke();
+      }
+      break;
+    case 'firerate':
+      g.fillStyle = '#ffd43b'; g.strokeStyle = '#b07d0b'; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(60, 6); g.lineTo(24, 56); g.lineTo(46, 56); g.lineTo(38, 94); g.lineTo(78, 40); g.lineTo(55, 40); g.lineTo(66, 6); g.closePath();
+      g.fill(); g.stroke();
+      break;
+    case 'maxhp':
+      g.fillStyle = '#ff4d6d'; heartPath(g, 50, 52, 1.15); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.3)'; g.beginPath(); g.ellipse(32, 36, 8, 5, -0.6, 0, TAU); g.fill();
+      g.fillStyle = '#fff'; g.fillRect(44, 34, 12, 34); g.fillRect(33, 45, 34, 12);
+      break;
+    case 'regen':
+      g.fillStyle = '#40c057'; rr(g, 38, 14, 24, 72, 7); g.fill(); rr(g, 14, 38, 72, 24, 7); g.fill();
+      g.fillStyle = '#8ce99a'; rr(g, 42, 18, 8, 64, 4); g.fill();
+      g.fillStyle = '#d3f9d8'; starPath(g, 80, 18, 4, 10, 3); g.fill(); starPath(g, 18, 82, 4, 8, 2.5); g.fill();
+      break;
+    case 'knockback':
+      g.fillStyle = '#7fb069'; g.beginPath(); g.arc(70, 50, 19, 0, TAU); g.fill();
+      g.fillStyle = '#c92a2a'; g.beginPath(); g.arc(78, 44, 3, 0, TAU); g.arc(78, 56, 3, 0, TAU); g.fill();
+      g.strokeStyle = '#74c0fc'; g.lineWidth = 6;
+      for (let i = 0; i < 3; i++) { g.globalAlpha = 1 - i * 0.25; g.beginPath(); g.arc(14, 50, 18 + i * 12, -0.75, 0.75); g.stroke(); }
+      g.globalAlpha = 1;
+      break;
+    case 'velocity':
+      g.strokeStyle = '#ffe8a3'; g.lineWidth = 5;
+      for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(8 + i * 6, 36 + i * 14); g.lineTo(38 + i * 4, 36 + i * 14); g.stroke(); }
+      bulletShape(g, 64, 50, 20, 52, Math.PI / 2);
+      break;
+    case 'double':
+      bulletShape(g, 34, 46, 18, 56, 0); bulletShape(g, 66, 46, 18, 56, 0);
+      g.strokeStyle = 'rgba(255,232,163,0.7)'; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(34, 80); g.lineTo(34, 94); g.moveTo(66, 80); g.lineTo(66, 94); g.stroke();
+      break;
+    case 'spread':
+      for (const a of [-0.55, 0, 0.55]) bulletShape(g, 50 + Math.sin(a) * 30, 82 - Math.cos(a) * 32, 15, 42, a);
+      g.fillStyle = '#ffd43b'; g.beginPath(); g.arc(50, 88, 7, 0, TAU); g.fill();
+      break;
+    case 'pierce':
+      g.fillStyle = '#7fb069'; g.beginPath(); g.arc(38, 62, 15, 0, TAU); g.fill();
+      g.fillStyle = '#5e8c4a'; g.beginPath(); g.arc(64, 38, 15, 0, TAU); g.fill();
+      g.strokeStyle = '#f1f3f5'; g.lineWidth = 7;
+      g.beginPath(); g.moveTo(12, 88); g.lineTo(84, 16); g.stroke();
+      g.fillStyle = '#f1f3f5'; g.beginPath(); g.moveTo(92, 8); g.lineTo(70, 16); g.lineTo(84, 30); g.closePath(); g.fill();
+      break;
+    case 'crit':
+      g.strokeStyle = '#ff4757'; g.lineWidth = 7;
+      g.beginPath(); g.arc(50, 50, 30, 0, TAU); g.stroke();
+      g.beginPath(); g.moveTo(50, 6); g.lineTo(50, 30); g.moveTo(50, 70); g.lineTo(50, 94); g.moveTo(6, 50); g.lineTo(30, 50); g.moveTo(70, 50); g.lineTo(94, 50); g.stroke();
+      g.fillStyle = '#ffd43b'; g.beginPath(); g.arc(50, 50, 9, 0, TAU); g.fill();
+      break;
+    case 'lifesteal':
+      g.fillStyle = '#e03131';
+      g.beginPath(); g.moveTo(50, 8); g.quadraticCurveTo(24, 44, 24, 62); g.arc(50, 62, 26, Math.PI, 0, true); g.quadraticCurveTo(76, 44, 50, 8); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.ellipse(39, 60, 5, 9, 0.3, 0, TAU); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.moveTo(40, 74); g.lineTo(44, 86); g.lineTo(48, 74); g.moveTo(52, 74); g.lineTo(56, 86); g.lineTo(60, 74); g.fill();
+      break;
+    case 'blades':
+      g.translate(50, 50);
+      for (let k = 0; k < 3; k++) {
+        g.save(); g.rotate(k * TAU / 3);
+        g.fillStyle = '#dee2e6'; g.strokeStyle = '#868e96'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(0, -8); g.quadraticCurveTo(28, -34, 44, -6); g.quadraticCurveTo(24, -12, 8, 6); g.closePath(); g.fill(); g.stroke();
+        g.restore();
+      }
+      g.fillStyle = '#495057'; g.beginPath(); g.arc(0, 0, 10, 0, TAU); g.fill();
+      g.fillStyle = '#ffc93c'; g.beginPath(); g.arc(0, 0, 4, 0, TAU); g.fill();
+      break;
+    case 'explosive':
+      g.fillStyle = '#343a40'; g.beginPath(); g.arc(44, 60, 30, 0, TAU); g.fill();
+      g.fillStyle = '#495057'; rr(g, 52, 26, 16, 12, 3); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.arc(34, 50, 9, 0, TAU); g.fill();
+      g.strokeStyle = '#c9a26b'; g.lineWidth = 4; g.beginPath(); g.moveTo(60, 28); g.quadraticCurveTo(66, 12, 78, 16); g.stroke();
+      g.fillStyle = '#ff922b'; starPath(g, 80, 15, 7, 13, 5); g.fill();
+      g.fillStyle = '#ffe066'; starPath(g, 80, 15, 7, 7, 3); g.fill();
+      break;
+    case 'revive':
+      g.strokeStyle = '#ffd43b'; g.lineWidth = 6; g.beginPath(); g.ellipse(50, 18, 22, 7, 0, 0, TAU); g.stroke();
+      g.fillStyle = '#ff6b8a'; heartPath(g, 50, 60, 0.95); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.ellipse(14, 60, 10, 18, -0.4, 0, TAU); g.ellipse(86, 60, 10, 18, 0.4, 0, TAU); g.fill();
+      break;
+  }
+  g.restore();
+}
+const iconCache = {};
+function getIcon(id, px) {
+  const key = id + '_' + px;
+  if (!iconCache[key]) {
+    const c = document.createElement('canvas'); c.width = c.height = px;
+    drawIcon(c.getContext('2d'), id, 0, 0, px);
+    iconCache[key] = c;
+  }
+  return iconCache[key];
+}
+
+/* =====================================================================
+   Oyuncu
+   ===================================================================== */
+const PLAYER_COLORS = { skin: '#f1c27d', hair: '#4a2c17', shirt: '#2f7de1', pants: '#2b3a55', pack: '#7a5230', gun: '#2b2b2b', gunLight: '#5f5f5f' };
+const PLAYER_FLASH  = { skin: '#ff9a9a', hair: '#c0392b', shirt: '#ff4d4d', pants: '#b03030', pack: '#c44', gun: '#922', gunLight: '#c55' };
+
+function createPlayer() {
+  return {
+    x: WW / 2, y: WH / 2, vx: 0, vy: 0, r: C.player.radius, angle: -Math.PI / 2,
+    hp: C.player.maxHp, maxHp: C.player.maxHp, invuln: 0, fireCd: 0, muzzle: 0, recoil: 0, walk: 0,
+    alive: true, deathTimer: 0, bladeAngle: 0,
+    stats: { damageMult: 1, speedMult: 1, fireRateMult: 1, parallel: 1, spread: 0, pierce: 0, regen: 0, crit: 0,
+             knockback: 1, lifesteal: 0, blades: 0, velocityMult: 1, explosive: 0, revives: 0 },
+    levels: {}, order: [],
+  };
+}
+function healPlayer(v) {
+  if (!player || !player.alive) return;
+  player.hp = Math.min(player.maxHp, player.hp + v);
+}
+function screenToWorld(sx, sy) { return { x: (sx - W / 2) / viewScale + camX, y: (sy - H / 2) / viewScale + camY }; }
+
+function updatePlayer(dt) {
+  const p = player;
+  if (!p.alive) {
+    p.deathTimer -= dt;
+    if (p.deathTimer <= 0) gameOver();
+    return;
+  }
+  // --- Hareket ---
+  let mx = 0, my = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) my -= 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) my += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) mx -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) mx += 1;
+  if (sticks.move.active && sticks.move.mag > 0.12) { mx = sticks.move.vx; my = sticks.move.vy; }
+  const len = Math.hypot(mx, my);
+  if (len > 1) { mx /= len; my /= len; }
+  const spd = C.player.speed * p.stats.speedMult;
+  const k = 1 - Math.exp(-14 * dt);
+  p.vx += (mx * spd - p.vx) * k; p.vy += (my * spd - p.vy) * k;
+  p.x += p.vx * dt; p.y += p.vy * dt;
+  resolveStatic(p); clampBounds(p);
+  const moving = Math.hypot(p.vx, p.vy);
+  p.walk += moving * dt * 0.07;
+
+  // --- Nişan ve ateş ---
+  let firing = false;
+  if (input.touchMode) {
+    if (sticks.aim.active && sticks.aim.mag > 0.25) { p.angle = Math.atan2(sticks.aim.vy, sticks.aim.vx); firing = true; }
+    else if (moving > 30 && !sticks.aim.active) p.angle = lerpAngle(p.angle, Math.atan2(p.vy, p.vx), 1 - Math.exp(-8 * dt));
+  } else {
+    const m = screenToWorld(input.mouseX, input.mouseY);
+    p.angle = Math.atan2(m.y - p.y, m.x - p.x);
+    firing = input.mouseDown;
+  }
+  p.fireCd -= dt;
+  const interval = 1 / (C.player.fireRate * p.stats.fireRateMult);
+  let guard = 0;
+  while (firing && p.fireCd <= 0 && guard++ < 3) { shoot(); p.fireCd += interval; }
+  if (p.fireCd < 0) p.fireCd = 0;
+
+  p.invuln -= dt; p.muzzle -= dt; p.recoil = Math.max(0, p.recoil - dt * 8);
+  if (p.stats.regen > 0) healPlayer(p.stats.regen * dt);
+  p.bladeAngle += C.player.bladeSpeed * dt;
+}
+
+function shoot() {
+  const p = player, s = p.stats;
+  const spreadN = 1 + 2 * s.spread, step = 0.17;
+  const par = s.parallel;
+  const speed = C.player.bulletSpeed * s.velocityMult;
+  const life = (C.player.bulletRange * s.velocityMult) / speed;
+  const ca = Math.cos(p.angle), sa = Math.sin(p.angle);
+  const tip = p.r + 17;
+  const bx = p.x + ca * tip, by = p.y + sa * tip;
+  for (let i = 0; i < spreadN; i++) {
+    const a = p.angle + (i - (spreadN - 1) / 2) * step;
+    const c = Math.cos(a), sn = Math.sin(a);
+    for (let j = 0; j < par; j++) {
+      const off = (j - (par - 1) / 2) * 9;
+      const crit = Math.random() < s.crit;
+      bullets.push({
+        x: bx - sa * off, y: by + ca * off, vx: c * speed, vy: sn * speed, speed, life,
+        dmg: C.player.damage * s.damageMult * (crit ? C.player.critMultiplier : 1),
+        crit, pierce: s.pierce, hits: [], size: crit ? 4 : 3,
+      });
+    }
+  }
+  p.muzzle = 0.06; p.recoil = 1;
+  for (let i = 0; i < 2; i++) addParticle({ x: bx, y: by, vx: Math.cos(p.angle + rand(-0.5, 0.5)) * rand(150, 300), vy: Math.sin(p.angle + rand(-0.5, 0.5)) * rand(150, 300), life: 0.12, max: 0.12, size: 2, color: '#ffe066', drag: 6, kind: 1 });
+}
+
+function damagePlayer(amount, fx, fy) {
+  const p = player;
+  if (!p.alive || p.invuln > 0) return;
+  p.hp -= amount;
+  p.invuln = C.player.invulnTime;
+  shake = Math.max(shake, C.effects.shakeOnHit);
+  hitVignette = 1;
+  const dx = p.x - fx, dy = p.y - fy, d = Math.hypot(dx, dy) || 1;
+  p.vx += dx / d * 260; p.vy += dy / d * 260;
+  spawnBlood(p.x, p.y, dx / d, dy / d, 8, 220, true);
+  if (p.hp <= 0) {
+    if (p.stats.revives > 0) {
+      // İkinci Şans
+      p.stats.revives--;
+      p.hp = p.maxHp * 0.5; p.invuln = 2.5;
+      addText(p.x, p.y - 40, 'İKİNCİ ŞANS!', '#ffd43b', 26, 1.6);
+      addParticle({ x: p.x, y: p.y, vx: 0, vy: 0, life: 0.7, max: 0.7, size: 20, grow: 420, color: '#ffd43b', drag: 0, kind: 2 });
+      for (const z of zombies) {
+        const zx = z.x - p.x, zy = z.y - p.y, zd = Math.hypot(zx, zy) || 1;
+        if (zd < 260) { z.kbx += zx / zd * 900 / z.mass; z.kby += zy / zd * 900 / z.mass; }
+      }
+    } else {
+      p.hp = 0; p.alive = false; p.deathTimer = 1.6;
+      shake = 18;
+      spawnBlood(p.x, p.y, 0, 0, 40, 320, true);
+      addDecal(p.x, p.y, 1.6);
+      releaseInputs();
+    }
+  }
+}
+
+/* =====================================================================
+   Zombiler
+   ===================================================================== */
+const ZOMBIE_LOOKS = {
+  normal: { skins: ['#7fb069', '#8cbf72', '#74a35f'], shirts: ['#6b4f3a', '#5a6b3a', '#4f5d75', '#7a5c61'], pants: '#3a3f55' },
+  runner: { skins: ['#b2cf6e', '#a5c25f'], shirts: ['#b8423a', '#c75b2a', '#a63d5a'], pants: '#2f2f3a' },
+  tank:   { skins: ['#5d8a48', '#567f43'], shirts: ['#4b4e6d', '#3f4a5a'], pants: '#2a2d3a' },
+  boss:   { skins: ['#6f8a3a'], shirts: ['#5b2a5e'], pants: '#2a1f2e' },
+};
+function spawnZombie(type, x, y) {
+  const t = C.zombies[type], n = wave.num, isBoss = type === 'boss';
+  const hpMul = isBoss ? 1 : 1 + C.waves.hpGrowth * (n - 1);
+  const spMul = isBoss ? 1 : 1 + C.waves.speedGrowth * (n - 1);
+  const look = ZOMBIE_LOOKS[type];
+  const z = {
+    id: ++zombieId, type, x, y, vx: 0, vy: 0, kbx: 0, kby: 0,
+    r: t.radius * (isBoss ? 1 : rand(0.95, 1.06)),
+    hp: t.hp * hpMul, maxHp: t.hp * hpMul, speed: t.speed * spMul * (isBoss ? 1 : rand(0.92, 1.08)),
+    damage: t.damage, mass: t.mass, score: t.score,
+    angle: Math.atan2(player.y - y, player.x - x), hitFlash: 0, walk: rand(0, TAU),
+    think: 0, direct: true, tx: x, ty: y, bladeCd: 0, stamp: 0, dead: false,
+    turn: type === 'runner' ? 9 : type === 'tank' ? 4 : 6,
+    skin: pick(look.skins), shirt: pick(look.shirts), pants: look.pants,
+  };
+  if (isBoss) {
+    z.state = 'chase'; z.timer = 0; z.dashCd = 3; z.dirX = 1; z.dirY = 0; z.enraged = false;
+    wave.boss = z;
+  }
+  zombies.push(z);
+  return z;
+}
+
+// Zombinin nasıl ilerleyeceğine karar ver (doğrudan mı, yol bularak mı)
+function think(z) {
+  z.think = 0.1 + Math.random() * 0.12;
+  const p = player, dx = p.x - z.x, dy = p.y - z.y, d2 = dx * dx + dy * dy;
+  if (d2 < 90 * 90 || (d2 < C.nav.losRange * C.nav.losRange && navLOS(z.x, z.y, p.x, p.y))) { z.direct = true; return; }
+  z.direct = !flowTarget(z);
+}
+
+// Boss'un özel davranışları: kovalama -> uyarı -> atılma -> toparlanma
+function updateBoss(z, dt) {
+  const p = player, B = C.zombies.boss;
+  const dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy) || 1;
+  if (!z.enraged && z.hp < z.maxHp * 0.5) {
+    z.enraged = true;
+    showBanner('DEV ZOMBİ ÖFKELENDİ!', 'Daha hızlı ve daha sık saldırıyor', 1.8, '#ff6b6b');
+  }
+  switch (z.state) {
+    case 'chase':
+      z.dashCd -= dt;
+      if (z.dashCd <= 0 && d < B.dashRange && p.alive && navLOS(z.x, z.y, p.x, p.y)) {
+        z.state = 'windup'; z.timer = B.dashWindup; z.dirX = dx / d; z.dirY = dy / d;
+      }
+      return null;
+    case 'windup':
+      z.timer -= dt;
+      if (z.timer > 0.25) { z.dirX = dx / d; z.dirY = dy / d; } // son anda yön kilitlenir: kaçabilirsin!
+      z.angle = Math.atan2(z.dirY, z.dirX);
+      if (z.timer <= 0) { z.state = 'dash'; z.timer = B.dashDuration; shake = Math.max(shake, 5); }
+      return { vx: 0, vy: 0 };
+    case 'dash':
+      z.timer -= dt;
+      if (Math.random() < 0.7) addParticle({ x: z.x - z.dirX * z.r + rand(-20, 20), y: z.y - z.dirY * z.r + rand(-20, 20), vx: rand(-30, 30), vy: rand(-30, 30), life: 0.5, max: 0.5, size: rand(8, 14), grow: 30, color: '#a89f80', drag: 2, kind: 3 });
+      if (z.timer <= 0) { z.state = 'recover'; z.timer = B.recoverTime; }
+      return { vx: z.dirX * B.dashSpeed, vy: z.dirY * B.dashSpeed };
+    case 'recover':
+      z.timer -= dt;
+      if (z.timer <= 0) { z.state = 'chase'; z.dashCd = rand(B.dashCooldownMin, B.dashCooldownMax) * (z.enraged ? 0.6 : 1); }
+      return null;
+  }
+  return null;
+}
+
+function updateZombies(dt) {
+  const p = player;
+  for (const z of zombies) {
+    if (z.dead) continue;
+    z.hitFlash -= dt; z.bladeCd -= dt;
+    const override = z.type === 'boss' ? updateBoss(z, dt) : null;
+    if (override) { z.vx = override.vx; z.vy = override.vy; }
+    else {
+      z.think -= dt;
+      if (z.think <= 0) think(z);
+      let tx = z.direct ? p.x : z.tx, ty = z.direct ? p.y : z.ty;
+      let dx = tx - z.x, dy = ty - z.y, d = Math.hypot(dx, dy);
+      if (!z.direct && d < 12) { // hedef hücreye vardı, hemen yeni hedef
+        think(z);
+        tx = z.direct ? p.x : z.tx; ty = z.direct ? p.y : z.ty;
+        dx = tx - z.x; dy = ty - z.y; d = Math.hypot(dx, dy);
+      }
+      let spd = z.speed;
+      if (z.type === 'boss') spd *= (z.enraged ? 1.25 : 1) * (z.state === 'recover' ? 0.35 : 1);
+      const dvx = d > 0.001 ? dx / d * spd : 0, dvy = d > 0.001 ? dy / d * spd : 0;
+      const k = 1 - Math.exp(-z.turn * dt);
+      z.vx += (dvx - z.vx) * k; z.vy += (dvy - z.vy) * k;
+    }
+    z.x += (z.vx + z.kbx) * dt; z.y += (z.vy + z.kby) * dt;
+    const kd = Math.exp(-9 * dt); z.kbx *= kd; z.kby *= kd;
+    const hit = resolveStatic(z);
+    clampBounds(z);
+    if (hit && z.state === 'dash') { z.state = 'recover'; z.timer = C.zombies.boss.recoverTime; shake = Math.max(shake, 7); }
+    const sp = Math.hypot(z.vx, z.vy);
+    if (z.state !== 'windup' && sp > 5) z.angle = lerpAngle(z.angle, Math.atan2(z.vy, z.vx), 1 - Math.exp(-8 * dt));
+    z.walk += sp * dt * 0.09;
+  }
+}
+
+// Zombilerin birbirinin içine girmesini engelle + oyuncuya temas hasarı
+function separateZombies() {
+  const p = player;
+  for (const a of zombies) {
+    if (a.dead) continue;
+    const list = zgQuery(a.x - a.r, a.y - a.r, a.x + a.r, a.y + a.r, _qa);
+    for (const b of list) {
+      if (b.id <= a.id) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, min = a.r + b.r, d2 = dx * dx + dy * dy;
+      if (d2 >= min * min) continue;
+      if (d2 < 0.0001) { b.x += rand(-1, 1); b.y += rand(-1, 1); continue; }
+      const d = Math.sqrt(d2), ov = min - d, nx = dx / d, ny = dy / d;
+      const wa = b.mass / (a.mass + b.mass);
+      a.x -= nx * ov * wa; a.y -= ny * ov * wa;
+      b.x += nx * ov * (1 - wa); b.y += ny * ov * (1 - wa);
+    }
+  }
+  for (const z of zombies) {
+    if (z.dead) continue;
+    if (p.alive) {
+      const dx = z.x - p.x, dy = z.y - p.y, min = z.r + p.r, d2 = dx * dx + dy * dy;
+      if (d2 < (min + 2) * (min + 2)) {
+        const d = Math.sqrt(d2) || 0.01;
+        if (d < min) { z.x = p.x + dx / d * min; z.y = p.y + dy / d * min; }
+        damagePlayer(z.damage * (z.state === 'dash' ? 1.5 : 1), z.x, z.y);
+      }
+    }
+    resolveStatic(z); clampBounds(z);
+  }
+}
+
+function hitZombie(z, dmg, dirx, diry, kbMul, isCrit, hx, hy) {
+  if (z.dead) return;
+  z.hp -= dmg; z.hitFlash = 0.09;
+  const kb = C.player.baseKnockback * kbMul / z.mass;
+  z.kbx += dirx * kb; z.kby += diry * kb;
+  spawnBlood(hx, hy, dirx, diry, isCrit ? 7 : 4, 200, false);
+  if (isCrit) addText(z.x + rand(-8, 8), z.y - z.r - 6, Math.round(dmg) + '!', '#ffd43b', 18, 0.7);
+  if (z.hp <= 0) killZombie(z);
+}
+
+function killZombie(z) {
+  if (z.dead) return;
+  z.dead = true;
+  score += z.score; kills++;
+  const big = z.type === 'boss' ? 4 : z.type === 'tank' ? 1.6 : 1;
+  spawnBlood(z.x, z.y, 0, 0, Math.round(14 * big), 260 * Math.sqrt(big), false);
+  for (let i = 0; i < 5 * big; i++) {
+    const a = rand(0, TAU), sp = rand(60, 220);
+    addParticle({ x: z.x, y: z.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.8), max: 0.8, size: rand(2.5, 4.5) * Math.sqrt(big), color: z.skin, drag: 4, kind: 0 });
+  }
+  addDecal(z.x, z.y, (z.r / 16));
+  if (player.stats.lifesteal > 0 && player.alive) {
+    healPlayer(player.stats.lifesteal);
+    if (Math.random() < 0.35) addText(player.x + rand(-10, 10), player.y - 28, '+' + player.stats.lifesteal, '#69db7c', 14, 0.6);
+  }
+  if (z.type === 'boss') {
+    shake = 22; wave.boss = null;
+    addParticle({ x: z.x, y: z.y, vx: 0, vy: 0, life: 0.9, max: 0.9, size: 30, grow: 600, color: '#ff6b6b', drag: 0, kind: 2 });
+    showBanner('DEV ZOMBİ YENİLDİ!', '+' + z.score + ' puan', 2.2, '#ffd43b');
+  }
+}
+
+function explode(x, y, baseDmg, except) {
+  const lvl = player.stats.explosive;
+  const R = 50 + 16 * (lvl - 1), dmg = baseDmg * (0.35 + 0.15 * (lvl - 1));
+  addParticle({ x, y, vx: 0, vy: 0, life: 0.25, max: 0.25, size: 6, grow: R * 4, color: '#ffa94d', drag: 0, kind: 2 });
+  for (let i = 0; i < 4; i++) { const a = rand(0, TAU), sp = rand(80, 220); addParticle({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.25, max: 0.25, size: 2, color: '#ffd43b', drag: 5, kind: 1 }); }
+  const list = zgQuery(x - R - 50, y - R - 50, x + R + 50, y + R + 50, _qc);
+  for (const z of list) {
+    if (z === except || z.dead) continue;
+    const dx = z.x - x, dy = z.y - y, d = Math.hypot(dx, dy) || 1;
+    if (d < R + z.r) hitZombie(z, dmg, dx / d, dy / d, 0.6, false, z.x, z.y);
+  }
+}
+
+/* =====================================================================
+   Mermiler ve bıçaklar
+   ===================================================================== */
+function updateBullets(dt) {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i], ox = b.x, oy = b.y;
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    let dead = b.life <= 0 || b.x < 0 || b.y < 0 || b.x > WW || b.y > WH;
+    if (!dead && segmentHitsObstacle(ox, oy, b.x, b.y)) {
+      dead = true;
+      for (let k = 0; k < 3; k++) addParticle({ x: b.x, y: b.y, vx: -b.vx * rand(0.1, 0.3) + rand(-80, 80), vy: -b.vy * rand(0.1, 0.3) + rand(-80, 80), life: 0.2, max: 0.2, size: 2, color: '#ffe8a3', drag: 6, kind: 1 });
+    }
+    if (!dead) {
+      const list = zgQuery(Math.min(ox, b.x) - 4, Math.min(oy, b.y) - 4, Math.max(ox, b.x) + 4, Math.max(oy, b.y) + 4, _qb);
+      for (const z of list) {
+        if (z.dead || b.hits.includes(z.id)) continue;
+        if (segCircle(ox, oy, b.x, b.y, z.x, z.y, z.r + b.size)) {
+          const dx = b.vx / b.speed, dy = b.vy / b.speed;
+          b.hits.push(z.id);
+          hitZombie(z, b.dmg, dx, dy, player.stats.knockback, b.crit, b.x, b.y);
+          if (player.stats.explosive > 0) explode(b.x, b.y, b.dmg, z);
+          if (b.hits.length > b.pierce) { dead = true; break; }
+        }
+      }
+    }
+    if (dead) { bullets[i] = bullets[bullets.length - 1]; bullets.pop(); }
+  }
+}
+
+function bladePositions() {
+  const p = player, n = p.stats.blades, out = [];
+  for (let k = 0; k < n; k++) {
+    const a = p.bladeAngle + k * TAU / n;
+    out.push({ x: p.x + Math.cos(a) * C.player.bladeRadius, y: p.y + Math.sin(a) * C.player.bladeRadius, a });
+  }
+  return out;
+}
+function updateBlades() {
+  const p = player;
+  if (!p.alive || p.stats.blades <= 0) return;
+  const R = C.player.bladeRadius;
+  const list = zgQuery(p.x - R - 70, p.y - R - 70, p.x + R + 70, p.y + R + 70, _qd);
+  const blades = bladePositions();
+  for (const z of list) {
+    if (z.dead || z.bladeCd > 0) continue;
+    for (const b of blades) {
+      const dx = z.x - b.x, dy = z.y - b.y;
+      if (dx * dx + dy * dy < (z.r + 13) * (z.r + 13)) {
+        const d = Math.hypot(z.x - p.x, z.y - p.y) || 1;
+        z.bladeCd = C.player.bladeHitCooldown;
+        hitZombie(z, C.player.bladeDamage * p.stats.damageMult, (z.x - p.x) / d, (z.y - p.y) / d, 0.8, false, b.x, b.y);
+        break;
+      }
+    }
+  }
+}
+
+/* =====================================================================
+   Efektler: parçacıklar, kan lekeleri, yüzen yazılar, ekran yazısı
+   ===================================================================== */
+const BLOOD = ['#8a0f0f', '#b3161b', '#6e0b0b', '#a01218'];
+function addParticle(o) { if (particles.length < C.effects.maxParticles) particles.push(o); }
+function spawnBlood(x, y, dx, dy, count, speed, omni) {
+  const base = Math.atan2(dy, dx), any = omni || (dx === 0 && dy === 0);
+  for (let i = 0; i < count; i++) {
+    const a = any ? rand(0, TAU) : base + rand(-0.9, 0.9), sp = rand(0.3, 1) * speed;
+    addParticle({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.3, 0.7), max: 0.7, size: rand(1.5, 3.6), color: pick(BLOOD), drag: 5, kind: 0 });
+  }
+}
+function addDecal(x, y, s) {
+  const blobs = [];
+  for (let i = 0; i < 4; i++) blobs.push([rand(-10, 10) * s, rand(-10, 10) * s, rand(5, 11) * s]);
+  decals.push({ x, y, blobs, life: C.effects.decalLife, max: C.effects.decalLife, c: pick(['#9c1016', '#8a0d12', '#a8141b']) });
+  if (decals.length > C.effects.maxDecals) decals.shift();
+}
+function addText(x, y, text, color, size, life) { texts.push({ x, y, text, color, size, life, max: life, vy: -60 }); }
+function showBanner(text, sub, dur, color) { banner = { text, sub: sub || '', t: 0, dur: dur || 2.2, color: color || '#ffffff' }; }
+
+function updateEffects(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles[i] = particles[particles.length - 1]; particles.pop(); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.drag) { const d = Math.exp(-p.drag * dt); p.vx *= d; p.vy *= d; }
+    if (p.grow) p.size += p.grow * dt;
+  }
+  for (let i = decals.length - 1; i >= 0; i--) { decals[i].life -= dt; if (decals[i].life <= 0) decals.splice(i, 1); }
+  for (let i = texts.length - 1; i >= 0; i--) {
+    const t = texts[i]; t.life -= dt; t.y += t.vy * dt; t.vy *= Math.exp(-3 * dt);
+    if (t.life <= 0) texts.splice(i, 1);
+  }
+  if (banner) { banner.t += dt; if (banner.t > banner.dur) banner = null; }
+  hitVignette = Math.max(0, hitVignette - dt * 2.2);
+  shake = Math.max(0, shake - dt * 30);
+}
+
+/* =====================================================================
+   Dalga sistemi
+   ===================================================================== */
+function buildQueue(n) {
+  const WV = C.waves, count = WV.counts[Math.min(n, WV.counts.length) - 1], q = [];
+  for (let i = 0; i < count; i++) {
+    const r = Math.random(); let acc = 0, type = 'normal';
+    if (n >= WV.tankFromWave) { acc += WV.tankChance; if (r < acc) type = 'tank'; }
+    if (type === 'normal' && n >= WV.runnerFromWave) { acc += WV.runnerChance; if (r < acc) type = 'runner'; }
+    q.push(type);
+  }
+  if (n === WV.total) q.splice(Math.floor(q.length * WV.bossSpawnAt), 0, 'boss');
+  return q;
+}
+function startWave(n) {
+  wave.num = n; wave.queue = buildQueue(n); wave.active = true; wave.cleared = false;
+  wave.startDelay = C.waves.startDelay; wave.spawnTimer = 0; wave.boss = null;
+  let sub = '';
+  if (n === C.waves.total) sub = 'SON DALGA — DEV ZOMBİ YAKLAŞIYOR!';
+  else if (n === C.waves.tankFromWave) sub = 'Dikkat: Tank zombiler geliyor!';
+  else if (n === C.waves.runnerFromWave) sub = 'Dikkat: Koşucu zombiler geliyor!';
+  else if (n === 1) sub = 'Hayatta kal!';
+  showBanner('DALGA ' + n, sub, 2.4, n === C.waves.total ? '#ff6b6b' : '#ffffff');
+}
+function remainingZombies() { return wave.queue.length + zombies.length; }
+
+// Ekran dışında, harita kenarında bir doğma noktası bul
+function findSpawnPoint(r) {
+  const m = 45, halfW = W / 2 / viewScale + 80, halfH = H / 2 / viewScale + 80;
+  for (let t = 0; t < 40; t++) {
+    const side = randInt(0, 3); let x, y;
+    if (side === 0) { x = rand(m, WW - m); y = m; }
+    else if (side === 1) { x = WW - m; y = rand(m, WH - m); }
+    else if (side === 2) { x = rand(m, WW - m); y = WH - m; }
+    else { x = m; y = rand(m, WH - m); }
+    if (Math.abs(x - camX) < halfW && Math.abs(y - camY) < halfH) continue;
+    if (pointInObstacles(x, y, r + 4)) continue;
+    return { x, y };
+  }
+  // yedek: oyuncuya en uzak köşe
+  const corners = [[m, m], [WW - m, m], [m, WH - m], [WW - m, WH - m]];
+  corners.sort((a, b) => Math.hypot(b[0] - player.x, b[1] - player.y) - Math.hypot(a[0] - player.x, a[1] - player.y));
+  return { x: corners[0][0], y: corners[0][1] };
+}
+
+function updateWaves(dt) {
+  if (wave.active) {
+    if (wave.startDelay > 0) { wave.startDelay -= dt; return; }
+    wave.spawnTimer -= dt;
+    if (wave.queue.length && wave.spawnTimer <= 0 && zombies.length < C.waves.maxAlive && player.alive) {
+      const n = wave.num, tt = (n - 1) / Math.max(1, C.waves.total - 1);
+      const interval = lerp(C.waves.spawnIntervalFirst, C.waves.spawnIntervalLast, tt);
+      if (wave.queue[0] === 'boss') {
+        wave.queue.shift();
+        const sp = findSpawnPoint(C.zombies.boss.radius);
+        spawnZombie('boss', sp.x, sp.y);
+        showBanner('DEV ZOMBİ GELDİ!', 'Kırmızı çizgiye dikkat — atılma saldırısından kaç!', 2.6, '#ff6b6b');
+        shake = 12;
+        wave.spawnTimer = interval * 3;
+      } else {
+        let group = Math.min(wave.queue.length, randInt(1, 1 + Math.floor(n / 3)), C.waves.maxAlive - zombies.length);
+        const sp = findSpawnPoint(28);
+        let spawned = 0;
+        while (spawned < group && wave.queue.length && wave.queue[0] !== 'boss') {
+          const type = wave.queue.shift();
+          let x = clamp(sp.x + rand(-60, 60), 30, WW - 30), y = clamp(sp.y + rand(-60, 60), 30, WH - 30);
+          if (pointInObstacles(x, y, C.zombies[type].radius)) { x = sp.x; y = sp.y; }
+          spawnZombie(type, x, y);
+          spawned++;
+        }
+        wave.spawnTimer = interval * Math.max(1, spawned) * rand(0.75, 1.25);
+      }
+    }
+    if (!wave.queue.length && zombies.length === 0 && player.alive) {
+      wave.active = false; wave.cleared = true; wave.clearTimer = C.waves.betweenWaveDelay;
+      const bonus = C.waves.clearBonus * wave.num;
+      score += bonus;
+      healPlayer(C.waves.healOnWaveClear);
+      showBanner('DALGA ' + wave.num + ' TAMAMLANDI!', '+' + bonus + ' bonus puan', C.waves.betweenWaveDelay + 0.3, '#69db7c');
+    }
+  } else if (wave.cleared) {
+    wave.clearTimer -= dt;
+    if (wave.clearTimer <= 0) {
+      wave.cleared = false;
+      if (wave.num >= C.waves.total) winGame(); else openUpgrade(false);
+    }
+  }
+}
+
+/* =====================================================================
+   Ana güncelleme
+   ===================================================================== */
+function update(dt) {
+  playTime += player.alive ? dt : 0;
+  updatePlayer(dt);
+  if (state !== 'playing') return; // oyuncu öldüyse gameOver() durumu değiştirmiş olabilir
+  updateWaves(dt);
+  if (state !== 'playing') return;
+  // Akış alanını periyodik olarak (veya oyuncu hücre değiştirince) yenile
+  navTimer -= dt;
+  const pc = navCellOf(player.x, player.y);
+  if (navTimer <= 0 || pc !== navLastCell) { computeFlow(player.x, player.y); navTimer = C.nav.refresh; navLastCell = pc; }
+  updateZombies(dt);
+  zgBuild();
+  separateZombies();
+  zgBuild();
+  updateBullets(dt);
+  updateBlades();
+  if (zombies.some(z => z.dead)) zombies = zombies.filter(z => !z.dead);
+  updateEffects(dt);
+  updateCamera(dt);
+  // ağaç tepeleri oyuncu altındayken saydamlaşır
+  for (const t of world.trees) {
+    const near = Math.abs(t.x - player.x) < t.cr + 30 && Math.abs(t.y - player.y) < t.cr + 30 && Math.hypot(t.x - player.x, t.y - player.y) < t.cr + 12;
+    t.alpha += ((near ? 0.42 : 1) - t.alpha) * Math.min(1, dt * 8);
+  }
+}
+function clampCamera() {
+  const halfW = W / 2 / viewScale, halfH = H / 2 / viewScale, ex = C.camera.edgeOverscroll;
+  camX = (WW + 2 * ex < 2 * halfW) ? WW / 2 : clamp(camX, halfW - ex, WW - halfW + ex);
+  camY = (WH + 2 * ex < 2 * halfH) ? WH / 2 : clamp(camY, halfH - ex, WH - halfH + ex);
+}
+function updateCamera(dt) {
+  const k = 1 - Math.exp(-C.camera.followSharpness * dt);
+  camX += (player.x - camX) * k; camY += (player.y - camY) * k;
+  clampCamera();
+}
+
+/* =====================================================================
+   Çizim
+   ===================================================================== */
+const view = { l: 0, t: 0, r: 0, b: 0 };
+const inView = (x, y, m) => x + m > view.l && x - m < view.r && y + m > view.t && y - m < view.b;
+
+function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
+function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU); ctx.fill(); }
+function line(x0, y0, x1, y1) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
+
+function drawGround() {
+  const i0 = clamp(Math.floor(view.l / CHUNK), 0, CHUNK_COLS - 1), i1 = clamp(Math.floor(view.r / CHUNK), 0, CHUNK_COLS - 1);
+  const j0 = clamp(Math.floor(view.t / CHUNK), 0, CHUNK_ROWS - 1), j1 = clamp(Math.floor(view.b / CHUNK), 0, CHUNK_ROWS - 1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) ctx.drawImage(getChunk(i, j), i * CHUNK - 1, j * CHUNK - 1);
+}
+function drawBorderForest() {
+  ctx.fillStyle = '#18301a';
+  ctx.beginPath();
+  for (const b of world.border) if (inView(b.x, b.y, b.r)) { ctx.moveTo(b.x + b.r, b.y); ctx.arc(b.x, b.y, b.r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = '#244a24';
+  ctx.beginPath();
+  for (const b of world.border) if (inView(b.x, b.y, b.r)) { ctx.moveTo(b.x - b.r * 0.2 + b.r * 0.6, b.y - b.r * 0.2); ctx.arc(b.x - b.r * 0.2, b.y - b.r * 0.2, b.r * 0.6, 0, TAU); }
+  ctx.fill();
+}
+function drawDecals() {
+  for (const d of decals) {
+    if (!inView(d.x, d.y, 40)) continue;
+    ctx.globalAlpha = Math.min(1, d.life / 4) * 0.55;
+    ctx.fillStyle = d.c; ctx.beginPath();
+    for (const b of d.blobs) { ctx.moveTo(d.x + b[0] + b[2], d.y + b[1]); ctx.arc(d.x + b[0], d.y + b[1], b[2], 0, TAU); }
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawBush(b) {
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'; ell(b.x + 4, b.y + 6, b.r * 1.05, b.r * 0.85);
+  ctx.fillStyle = b.dark; ctx.beginPath();
+  for (const k of b.blobs) { ctx.moveTo(b.x + k.dx + k.r, b.y + k.dy); ctx.arc(b.x + k.dx, b.y + k.dy, k.r, 0, TAU); }
+  ctx.fill();
+  ctx.fillStyle = b.light; ctx.beginPath();
+  for (const k of b.blobs) { const r = k.r * 0.55; ctx.moveTo(b.x + k.dx - k.r * 0.25 + r, b.y + k.dy - k.r * 0.25); ctx.arc(b.x + k.dx - k.r * 0.25, b.y + k.dy - k.r * 0.25, r, 0, TAU); }
+  ctx.fill();
+  if (b.berries) { ctx.fillStyle = '#e03131'; ctx.beginPath(); for (const e of b.berries) { ctx.moveTo(b.x + e.dx + 2.2, b.y + e.dy); ctx.arc(b.x + e.dx, b.y + e.dy, 2.2, 0, TAU); } ctx.fill(); }
+}
+function drawRock(o) {
+  const poly = (ox, oy, s) => { ctx.beginPath(); o.pts.forEach((p, i) => { const x = o.x + ox + p[0] * s, y = o.y + oy + p[1] * s; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.fill(); };
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; poly(5, 6, 1);
+  ctx.fillStyle = o.c1; poly(0, 0, 1);
+  ctx.fillStyle = o.c2; poly(-o.r * 0.14, -o.r * 0.18, 0.68);
+  ctx.strokeStyle = 'rgba(40,40,40,0.35)'; ctx.lineWidth = 1.5;
+  line(o.x - o.r * 0.2, o.y + o.r * 0.1, o.x + o.r * 0.3, o.y + o.r * 0.45);
+}
+function drawFence(f) {
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(f.x + 4, f.y + 6, f.w, f.h);
+  ctx.fillStyle = '#8b5a2b';
+  if (f.horiz) { ctx.fillRect(f.x, f.y + 1, f.w, 4); ctx.fillRect(f.x, f.y + f.h - 5, f.w, 4); }
+  else { ctx.fillRect(f.x + 1, f.y, 4, f.h); ctx.fillRect(f.x + f.w - 5, f.y, 4, f.h); }
+  ctx.fillStyle = '#a8703c';
+  if (f.horiz) { ctx.fillRect(f.x, f.y + 1, f.w, 1.5); ctx.fillRect(f.x, f.y + f.h - 5, f.w, 1.5); }
+  else { ctx.fillRect(f.x + 1, f.y, 1.5, f.h); ctx.fillRect(f.x + f.w - 5, f.y, 1.5, f.h); }
+  const len = f.horiz ? f.w : f.h, n = Math.max(2, Math.round(len / 36) + 1);
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const px = f.horiz ? f.x + t * f.w : f.x + f.w / 2, py = f.horiz ? f.y + f.h / 2 : f.y + t * f.h;
+    ctx.fillStyle = '#5e3b1d'; ctx.fillRect(px - 6, py - 6, 12, 12);
+    ctx.fillStyle = '#8f5f34'; ctx.fillRect(px - 6, py - 6, 12, 3.5);
+  }
+}
+function drawSign(s) {
+  ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.rot);
+  const w = Math.max(48, s.text.length * 6.4 + 12);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; rr(ctx, -w / 2 + 4, -12 + 6, w, 24, 3); ctx.fill();
+  ctx.fillStyle = '#5e3b1d'; ctx.fillRect(-3, 8, 6, 10);
+  ctx.fillStyle = '#c8924f'; rr(ctx, -w / 2, -12, w, 24, 3); ctx.fill();
+  ctx.strokeStyle = '#7a4f24'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = 'rgba(122,79,36,0.5)'; ctx.lineWidth = 1; line(-w / 2 + 3, 0, w / 2 - 3, 0);
+  ctx.fillStyle = '#3b2410'; ctx.font = 'bold 9px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(s.text, 0, 1);
+  ctx.restore();
+}
+function drawLowLayer() {
+  for (const b of world.bushes) if (inView(b.x, b.y, b.r + 10)) drawBush(b);
+  for (const t of world.trees) {
+    if (!inView(t.x, t.y, t.cr + 30)) continue;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ell(t.x + t.cr * 0.25, t.y + t.cr * 0.3, t.cr * 1.02, t.cr * 0.88);
+    ctx.fillStyle = '#5b3a1e'; circle(t.x, t.y, t.r * 0.55);
+    ctx.fillStyle = '#7a5230'; circle(t.x - 2, t.y - 2, t.r * 0.32);
+  }
+  for (const r of world.rocks) if (inView(r.x, r.y, r.r * 1.3 + 8)) drawRock(r);
+  for (const f of world.fences) if (inView(f.x + f.w / 2, f.y + f.h / 2, Math.max(f.w, f.h))) drawFence(f);
+  for (const s of world.signs) if (inView(s.x, s.y, 60)) drawSign(s);
+}
+function drawCanopies() {
+  for (const t of world.trees) {
+    if (!inView(t.x, t.y, t.cr + 10)) continue;
+    ctx.globalAlpha = t.alpha;
+    const layer = (color, sc, ox, oy) => {
+      ctx.fillStyle = color; ctx.beginPath();
+      for (const b of t.blobs) { const r = b.r * sc, x = t.x + b.dx + ox, y = t.y + b.dy + oy; ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU); }
+      ctx.fill();
+    };
+    layer(t.pal.dark, 1, 0, 0);
+    layer(t.pal.mid, 0.8, -t.cr * 0.06, -t.cr * 0.07);
+    layer(t.pal.light, 0.42, -t.cr * 0.16, -t.cr * 0.18);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// --- Zombi çizimi (16 yarıçaplı tasarım, ölçeklenir) ---
+function drawZombie(z) {
+  const s = z.r / 16, flash = z.hitFlash > 0;
+  const skin = flash ? '#ffffff' : z.skin, shirt = flash ? '#f1f1f1' : z.shirt, pants = flash ? '#dddddd' : z.pants;
+  ctx.save(); ctx.translate(z.x, z.y);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(2 * s, 5 * s, 15 * s, 12 * s);
+  ctx.rotate(z.angle); ctx.scale(s, s);
+  const w = Math.sin(z.walk);
+  // bacaklar
+  ctx.fillStyle = pants; ell(w * 5, -6, 5, 3.6); ell(-w * 5, 6, 5, 3.6);
+  // kollar
+  ctx.strokeStyle = skin; ctx.lineCap = 'round';
+  if (z.type === 'runner') { // koşarken kollar sallanır
+    ctx.lineWidth = 4;
+    line(1, -10, 9 + w * 7, -12); line(1, 10, 9 - w * 7, 12);
+    ctx.fillStyle = skin; circle(9 + w * 7, -12, 2.6); circle(9 - w * 7, 12, 2.6);
+  } else { // klasik zombi: kollar öne uzanmış
+    const sw = Math.sin(z.walk * 0.5 + 1) * 2;
+    ctx.lineWidth = z.type === 'tank' || z.type === 'boss' ? 6 : 4.5;
+    line(2, -10, 19 + sw, -8); line(2, 10, 19 - sw, 8);
+    ctx.fillStyle = skin; circle(19 + sw, -8, 3); circle(19 - sw, 8, 3);
+  }
+  // gövde
+  ctx.fillStyle = shirt; ell(0, 0, 8.5, 12.5);
+  if (!flash) {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; circle(-3, 6, 2.6); circle(2, -7, 2);
+    ctx.fillStyle = 'rgba(120,0,0,0.45)'; circle(3, 4, 1.8);
+  }
+  if (z.type === 'tank' && !flash) { ctx.fillStyle = '#6c757d'; ell(0, -10, 5, 4); ell(0, 10, 5, 4); }
+  if (z.type === 'boss') { // omuzlarda dikenler
+    ctx.fillStyle = flash ? '#fff' : '#adb5bd';
+    for (const sy of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-4, sy * 9); ctx.lineTo(-12, sy * 17); ctx.lineTo(2, sy * 12); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-8, sy * 5); ctx.lineTo(-17, sy * 9); ctx.lineTo(-6, sy * 9); ctx.closePath(); ctx.fill(); }
+  }
+  // kafa
+  ctx.fillStyle = skin; circle(1, 0, 7.2);
+  if (!flash) {
+    ctx.fillStyle = 'rgba(0,0,0,0.16)'; circle(-2, -2.5, 3);
+    ctx.fillStyle = z.type === 'boss' ? '#ff2020' : '#d42a2a';
+    circle(6, -2.8, z.type === 'boss' ? 1.6 : 1.3); circle(6, 2.8, z.type === 'boss' ? 1.6 : 1.3);
+  }
+  if (z.type === 'tank' && !flash) { ctx.fillStyle = '#495057'; ctx.beginPath(); ctx.arc(1, 0, 7.4, Math.PI * 0.55, Math.PI * 1.45); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+}
+function drawZombieBars() {
+  for (const z of zombies) {
+    if (z.type === 'boss' || !inView(z.x, z.y, z.r + 20)) continue;
+    const w = Math.max(22, z.r * 1.8), h = 4, x = z.x - w / 2, y = z.y - z.r - 11;
+    const r = clamp(z.hp / z.maxHp, 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+    ctx.fillStyle = r > 0.5 ? '#69db7c' : r > 0.25 ? '#ffd43b' : '#ff6b6b'; ctx.fillRect(x, y, w * r, h);
+  }
+}
+function drawBossTelegraph() {
+  const z = wave.boss;
+  if (!z || z.dead || z.state !== 'windup') return;
+  const L = C.zombies.boss.dashSpeed * C.zombies.boss.dashDuration + z.r;
+  const pulse = 0.25 + 0.2 * Math.sin(performance.now() / 60);
+  ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(Math.atan2(z.dirY, z.dirX));
+  ctx.fillStyle = `rgba(255,40,40,${pulse})`; ctx.fillRect(0, -z.r, L, z.r * 2);
+  ctx.strokeStyle = 'rgba(255,60,60,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([14, 10]); ctx.strokeRect(0, -z.r, L, z.r * 2); ctx.setLineDash([]);
+  ctx.restore();
+  ctx.fillStyle = `rgba(255,50,50,${pulse})`; circle(z.x, z.y, z.r + 10 + Math.sin(performance.now() / 50) * 4);
+}
+
+// --- Oyuncu çizimi ---
+function drawPlayer() {
+  const p = player;
+  if (!p.alive) return;
+  const flash = p.invuln > 0 && Math.floor(p.invuln * 16) % 2 === 0;
+  const pal = flash ? PLAYER_FLASH : PLAYER_COLORS, s = p.r / 16;
+  ctx.save(); ctx.translate(p.x, p.y);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ell(2, 5, 15 * s, 12 * s);
+  ctx.rotate(p.angle); ctx.scale(s, s);
+  const moving = Math.hypot(p.vx, p.vy) > 15, w = moving ? Math.sin(p.walk) : 0;
+  ctx.fillStyle = pal.pants; ell(w * 5, -5.5, 5, 3.6); ell(-w * 5, 5.5, 5, 3.6);
+  ctx.fillStyle = pal.pack; rr(ctx, -14, -7, 7, 14, 2); ctx.fill();
+  ctx.fillStyle = pal.shirt; ell(0, 0, 8.5, 12.5);
+  const rc = -p.recoil * 3;
+  ctx.fillStyle = pal.gun; rr(ctx, 6 + rc, -2.3, 27, 4.6, 1.5); ctx.fill();
+  ctx.fillStyle = pal.gunLight; ctx.fillRect(9 + rc, -2.3, 14, 1.4);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = pal.skin; ctx.lineWidth = 4.2;
+  line(1, 10, 14 + rc, 2.5); line(1, -10, 9 + rc, -1.5);
+  ctx.strokeStyle = pal.shirt; ctx.lineWidth = 5.2;
+  line(1, 10, 4.5, 8.5); line(1, -10, 4, -8);
+  ctx.fillStyle = pal.skin; circle(0.8, 0, 7.4);
+  ctx.fillStyle = pal.hair; circle(-1.6, 0, 6.5);
+  // namlu parlaması
+  if (p.muzzle > 0) {
+    const fx = 35 + rc;
+    ctx.fillStyle = 'rgba(255,220,120,0.35)'; circle(fx + 4, 0, 13);
+    ctx.fillStyle = '#ffe066'; starPath(ctx, fx + 3, 0, 6, rand(9, 13), 4, rand(0, 1)); ctx.fill();
+    ctx.fillStyle = '#ffffff'; circle(fx + 2, 0, 3.5);
+  }
+  ctx.restore();
+}
+function drawBlades() {
+  const p = player;
+  if (!p.alive || p.stats.blades <= 0) return;
+  ctx.strokeStyle = 'rgba(220,230,240,0.12)'; ctx.lineWidth = 16;
+  ctx.beginPath(); ctx.arc(p.x, p.y, C.player.bladeRadius, 0, TAU); ctx.stroke();
+  for (const b of bladePositions()) {
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a + Math.PI / 2);
+    ctx.fillStyle = 'rgba(200,230,255,0.25)'; circle(0, 0, 14);
+    ctx.fillStyle = '#e9ecef'; ctx.strokeStyle = '#868e96'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(16, 0); ctx.quadraticCurveTo(0, -8, -14, 0); ctx.quadraticCurveTo(0, 8, 16, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#495057'; circle(-10, 0, 3);
+    ctx.restore();
+  }
+}
+function drawBullets() {
+  // tüm mermiler iki geçişte çizilir: dış parıltı + iç çekirdek
+  ctx.lineCap = 'round';
+  for (let pass = 0; pass < 2; pass++) {
+    for (const critPass of [false, true]) {
+      ctx.beginPath();
+      for (const b of bullets) {
+        if (b.crit !== critPass || !inView(b.x, b.y, 30)) continue;
+        ctx.moveTo(b.x - b.vx * 0.022, b.y - b.vy * 0.022); ctx.lineTo(b.x, b.y);
+      }
+      if (pass === 0) { ctx.strokeStyle = critPass ? 'rgba(255,140,40,0.4)' : 'rgba(255,220,120,0.35)'; ctx.lineWidth = critPass ? 9 : 7; }
+      else { ctx.strokeStyle = critPass ? '#ffb347' : '#fff5cc'; ctx.lineWidth = critPass ? 3.5 : 2.6; }
+      ctx.stroke();
+    }
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    if (!inView(p.x, p.y, p.size + 20)) continue;
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = a;
+    if (p.kind === 0) { ctx.fillStyle = p.color; circle(p.x, p.y, p.size * (0.5 + 0.5 * a)); }
+    else if (p.kind === 1) { ctx.strokeStyle = p.color; ctx.lineWidth = p.size; line(p.x, p.y, p.x - p.vx * 0.03, p.y - p.vy * 0.03); }
+    else if (p.kind === 2) { ctx.strokeStyle = p.color; ctx.lineWidth = 4 * a + 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.stroke(); }
+    else { ctx.globalAlpha = a * 0.45; ctx.fillStyle = p.color; circle(p.x, p.y, p.size); }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawTexts() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const t of texts) {
+    ctx.globalAlpha = clamp(t.life / t.max * 1.5, 0, 1);
+    ctx.font = `900 ${t.size}px ${FONT}`;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(t.text, t.x, t.y);
+    ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// --- Ekran arayüzü (HUD) ---
+function hudText(text, x, y, size, color, align = 'left', weight = 800) {
+  ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(3, size * 0.22); ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.lineJoin = 'round';
+  ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+function drawHUD() {
+  const p = player, narrow = W < 640;
+  const top = 12 + safe.top, left = 12 + safe.left, right = W - 12 - safe.right;
+  // Can barı (sol üst)
+  const hbW = narrow ? Math.min(170, W * 0.42) : 260, hbH = narrow ? 18 : 22;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; rr(ctx, left, top, hbW + 38, hbH + 12, 10); ctx.fill();
+  ctx.fillStyle = '#ff4d6d'; heartPath(ctx, left + 18, top + (hbH + 12) / 2 + 1, 0.27); ctx.fill();
+  const bx = left + 32, by = top + 6, ratio = clamp(p.hp / p.maxHp, 0, 1);
+  ctx.fillStyle = '#2b1d1d'; rr(ctx, bx, by, hbW, hbH, 6); ctx.fill();
+  if (ratio > 0) {
+    const g = ctx.createLinearGradient(bx, by, bx, by + hbH);
+    const col = ratio > 0.5 ? ['#8ce99a', '#2f9e44'] : ratio > 0.25 ? ['#ffe066', '#f08c00'] : ['#ff8787', '#c92a2a'];
+    g.addColorStop(0, col[0]); g.addColorStop(1, col[1]);
+    ctx.fillStyle = g; rr(ctx, bx, by, Math.max(hbH * 0.6, hbW * ratio), hbH, 6); ctx.fill();
+  }
+  hudText(`${Math.ceil(p.hp)} / ${p.maxHp}`, bx + hbW / 2, by + hbH / 2 + 1, narrow ? 12 : 14, '#fff', 'center');
+
+  // Alınan özellikler (can barının altında küçük simgeler)
+  const isz = narrow ? 26 : 32, gap = 5;
+  const perRow = Math.max(3, Math.floor((hbW + 38) / (isz + gap)));
+  p.order.forEach((id, i) => {
+    const u = UPGRADE_BY_ID[id];
+    const x = left + (i % perRow) * (isz + gap), y = top + hbH + 20 + Math.floor(i / perRow) * (isz + gap);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; rr(ctx, x, y, isz, isz, 7); ctx.fill();
+    ctx.strokeStyle = RARITY[u.rarity].color; ctx.lineWidth = 2; rr(ctx, x + 1, y + 1, isz - 2, isz - 2, 6); ctx.stroke();
+    const px = Math.round((isz - 6) * DPR);
+    ctx.drawImage(getIcon(id, px), x + 3, y + 3, isz - 6, isz - 6);
+    const lv = id === 'revive' ? p.stats.revives : p.levels[id];
+    if (lv > 1 || id === 'revive') hudText('x' + lv, x + isz - 2, y + isz - 5, narrow ? 10 : 11, '#ffd43b', 'right');
+  });
+
+  // Dalga ve kalan zombi (üst orta; dar ekranda ikinci satır)
+  const wy = narrow ? top + hbH + 12 + (p.order.length ? Math.ceil(p.order.length / perRow) * (isz + gap) + 14 : 10) + 18 : top + 18;
+  const wx = narrow ? W / 2 : W / 2;
+  const pw = narrow ? 150 : 190;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; rr(ctx, wx - pw / 2, wy - 16, pw, narrow ? 50 : 56, 12); ctx.fill();
+  hudText(`DALGA ${Math.max(1, wave.num)}/${C.waves.total}`, wx, wy + 1, narrow ? 18 : 22, '#fff', 'center', 900);
+  hudText(`Kalan zombi: ${remainingZombies()}`, wx, wy + (narrow ? 22 : 25), narrow ? 12 : 14, '#ffc9c9', 'center', 700);
+
+  // Skor (sağ üst, duraklat butonunun solunda)
+  const sx = right - 52;
+  hudText('SKOR', sx, top + 10, narrow ? 11 : 12, '#ced4da', 'right', 800);
+  hudText(score.toLocaleString('tr-TR'), sx, top + 30, narrow ? 20 : 26, '#ffd43b', 'right', 900);
+  if (!narrow) hudText('Rekor: ' + Math.max(bestScore, score).toLocaleString('tr-TR'), sx, top + 52, 12, '#adb5bd', 'right', 700);
+
+  // Boss can barı
+  const boss = wave.boss;
+  if (boss && !boss.dead) {
+    const bw = Math.min(520, W - 40), bxx = W / 2 - bw / 2, byy = narrow ? wy + 48 : top + 80;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; rr(ctx, bxx - 6, byy - 6, bw + 12, 34, 10); ctx.fill();
+    const r = clamp(boss.hp / boss.maxHp, 0, 1);
+    ctx.fillStyle = '#3a0f0f'; rr(ctx, bxx, byy + 8, bw, 14, 5); ctx.fill();
+    const g = ctx.createLinearGradient(bxx, 0, bxx + bw, 0); g.addColorStop(0, '#c92a2a'); g.addColorStop(1, '#ff6b6b');
+    ctx.fillStyle = g; rr(ctx, bxx, byy + 8, Math.max(8, bw * r), 14, 5); ctx.fill();
+    hudText('DEV ZOMBİ' + (boss.enraged ? ' (ÖFKELİ)' : ''), W / 2, byy + 1, 12, '#ffc9c9', 'center', 900);
+  }
+}
+// Ekran dışındaki son zombileri gösteren oklar
+function drawEdgeArrows() {
+  const rem = remainingZombies();
+  if (rem === 0) return;
+  const showAll = zombies.length <= 5 && wave.queue.length === 0;
+  for (const z of zombies) {
+    if (!showAll && z.type !== 'boss') continue;
+    const sx = (z.x - camX) * viewScale + W / 2, sy = (z.y - camY) * viewScale + H / 2;
+    if (sx > 0 && sx < W && sy > 0 && sy < H) continue;
+    const dx = sx - W / 2, dy = sy - H / 2, m = 34;
+    const t = Math.min((W / 2 - m) / Math.abs(dx || 1e-6), (H / 2 - m) / Math.abs(dy || 1e-6));
+    const ax = W / 2 + dx * t, ay = H / 2 + dy * t, a = Math.atan2(dy, dx);
+    ctx.save(); ctx.translate(ax, ay); ctx.rotate(a);
+    ctx.fillStyle = z.type === 'boss' ? '#ff3b3b' : 'rgba(255,120,120,0.85)';
+    const s = z.type === 'boss' ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(14 * s, 0); ctx.lineTo(-8 * s, -10 * s); ctx.lineTo(-4 * s, 0); ctx.lineTo(-8 * s, 10 * s); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+function drawSticks() {
+  if (!input.touchMode || state !== 'playing') return;
+  const defs = [
+    [sticks.move, 26 + STICK_R + safe.left, H - 26 - STICK_R - safe.bottom, 'HAREKET'],
+    [sticks.aim, W - 26 - STICK_R - safe.right, H - 26 - STICK_R - safe.bottom, 'ATEŞ'],
+  ];
+  for (const [st, dx, dy, label] of defs) {
+    const bx = st.active ? st.bx : dx, by = st.active ? st.by : dy;
+    const kx = st.active ? st.kx : bx, ky = st.active ? st.ky : by;
+    ctx.fillStyle = st.active ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)';
+    ctx.beginPath(); ctx.arc(bx, by, STICK_R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = label === 'ATEŞ' ? (st.active ? 'rgba(255,110,90,0.85)' : 'rgba(255,110,90,0.45)') : (st.active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.4)');
+    ctx.beginPath(); ctx.arc(kx, ky, 26, 0, TAU); ctx.fill();
+    if (!st.active) hudText(label, bx, by + STICK_R + 14, 11, 'rgba(255,255,255,0.6)', 'center', 800);
+  }
+}
+function drawBanner() {
+  if (!banner) return;
+  const t = banner.t, d = banner.dur;
+  let a = 1;
+  if (t < 0.25) a = t / 0.25; else if (t > d - 0.5) a = Math.max(0, (d - t) / 0.5);
+  const sc = 1 + Math.max(0, 0.25 - t) * 2.4;
+  ctx.save(); ctx.globalAlpha = a; ctx.translate(W / 2, H * 0.36); ctx.scale(sc, sc);
+  const size = Math.min(86, W / (banner.text.length * 0.62 + 1));
+  hudText(banner.text, 0, 0, size, banner.color, 'center', 900);
+  if (banner.sub) hudText(banner.sub, 0, size * 0.75, Math.max(13, Math.min(22, W / 30)), '#ffe8cc', 'center', 700);
+  ctx.restore();
+}
+function drawVignette() {
+  const p = player, low = p.alive && p.hp / p.maxHp < 0.3 ? 0.35 + 0.15 * Math.sin(performance.now() / 180) : 0;
+  const a = Math.max(hitVignette * 0.6, low);
+  if (a <= 0.01) return;
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  g.addColorStop(0, 'rgba(200,0,0,0)'); g.addColorStop(1, `rgba(200,0,0,${a})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#16291a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const shx = shake > 0 ? rand(-shake, shake) : 0, shy = shake > 0 ? rand(-shake, shake) : 0;
+  const cx = camX + shx / viewScale, cy = camY + shy / viewScale;
+  const sc = viewScale * DPR;
+  ctx.setTransform(sc, 0, 0, sc, (W / 2 - cx * viewScale) * DPR, (H / 2 - cy * viewScale) * DPR);
+  view.l = cx - W / 2 / viewScale; view.r = cx + W / 2 / viewScale; view.t = cy - H / 2 / viewScale; view.b = cy + H / 2 / viewScale;
+
+  drawBorderForest();
+  drawGround();
+  drawDecals();
+  drawLowLayer();
+  if (player) {
+    drawBossTelegraph();
+    for (const z of zombies) if (inView(z.x, z.y, z.r + 30)) drawZombie(z);
+    drawBlades();
+    drawPlayer();
+    drawBullets();
+  }
+  drawParticles();
+  drawCanopies();
+  if (player) drawZombieBars();
+  drawTexts();
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (player && state !== 'menu') {
+    drawVignette();
+    drawEdgeArrows();
+    drawHUD();
+    drawSticks();
+    drawBanner();
+  }
+}
+
+/* =====================================================================
+   Ekranlar ve akış
+   ===================================================================== */
+let currentCards = [], cardsReadyAt = 0;
+function showOverlay(id) {
+  for (const o of document.querySelectorAll('.overlay')) o.classList.toggle('show', o.id === id);
+  $('btnPause').style.display = (id === null && state === 'playing') ? 'block' : 'none';
+}
+function setState(s, overlay) { state = s; showOverlay(overlay); }
+
+function newGame() {
+  generateWorld();
+  player = createPlayer();
+  zombies = []; bullets = []; particles = []; decals = []; texts = [];
+  score = 0; kills = 0; playTime = 0; zombieId = 0; shake = 0; hitVignette = 0; banner = null;
+  wave.num = 0; wave.queue = []; wave.active = false; wave.cleared = false; wave.boss = null;
+  camX = player.x; camY = player.y; clampCamera();
+  computeFlow(player.x, player.y); navTimer = C.nav.refresh;
+  releaseInputs();
+  openUpgrade(true);
+}
+
+function openUpgrade(first) {
+  releaseInputs();
+  banner = null;
+  currentCards = rollUpgrades();
+  $('upTitle').textContent = first ? 'Başlangıç Özelliği' : `Dalga ${wave.num} Tamamlandı!`;
+  $('upSub').textContent = first ? 'Hayatta kalmana yardım edecek bir özellik seç' : `Dalga ${wave.num + 1} öncesi bir özellik seç`;
+  const box = $('cards'); box.innerHTML = '';
+  currentCards.forEach((u, i) => {
+    const lv = player.levels[u.id] || 0;
+    const card = document.createElement('div');
+    card.className = 'card ' + u.rarity;
+    const cv = document.createElement('canvas'); cv.className = 'ic'; cv.width = cv.height = 176;
+    const g = cv.getContext('2d');
+    const gr = g.createRadialGradient(88, 88, 10, 88, 88, 88);
+    gr.addColorStop(0, RARITY[u.rarity].bg); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 176, 176);
+    drawIcon(g, u.id, 22, 22, 132);
+    const txt = document.createElement('div'); txt.className = 'txt';
+    txt.innerHTML = `<div class="rar">${RARITY[u.rarity].label}</div><div class="nm"></div><div class="ds"></div><div class="lv"></div>`;
+    txt.querySelector('.nm').textContent = u.name;
+    txt.querySelector('.ds').textContent = u.desc(lv);
+    txt.querySelector('.lv').textContent = (lv > 0 ? `Seviye ${lv} → ${lv + 1}` : 'Yeni!') + `  ·  [${i + 1}]`;
+    card.appendChild(cv); card.appendChild(txt);
+    card.addEventListener('click', () => chooseUpgrade(u));
+    box.appendChild(card);
+  });
+  cardsReadyAt = performance.now() + 350; // yanlışlıkla seçimi önlemek için kısa bekleme
+  setState('upgrade', 'upgrade');
+  if (!currentCards.length) chooseUpgrade(null); // tüm özellikler maksimumda
+}
+function chooseUpgrade(u) {
+  if (state !== 'upgrade' || performance.now() < cardsReadyAt && u) return;
+  if (u) {
+    const p = player;
+    if (!p.levels[u.id]) p.order.push(u.id);
+    p.levels[u.id] = (p.levels[u.id] || 0) + 1;
+    u.apply(p.stats, p);
+  }
+  currentCards = [];
+  setState('playing', null);
+  lastTime = performance.now();
+  startWave(wave.num + 1);
+}
+function togglePause() {
+  if (state === 'playing') { releaseInputs(); setState('paused', 'pause'); }
+  else if (state === 'paused') { setState('playing', null); lastTime = performance.now(); }
+}
+function statsHTML() {
+  return `Ulaşılan dalga: <b>${wave.num}</b> / ${C.waves.total}<br>Skor: <b>${score.toLocaleString('tr-TR')}</b><br>` +
+    `Öldürülen zombi: <b>${kills}</b><br>Süre: <b>${fmtTime(playTime)}</b><br>Rekor: <b>${Math.max(bestScore, score).toLocaleString('tr-TR')}</b>`;
+}
+function gameOver() {
+  saveBest();
+  banner = null;
+  $('goStats').innerHTML = statsHTML();
+  setState('gameover', 'gameover');
+}
+function winGame() {
+  saveBest();
+  banner = null;
+  $('winStats').innerHTML = statsHTML();
+  setState('win', 'win');
+}
+function toMenu() {
+  saveBest();
+  player = null; zombies = []; bullets = []; texts = []; banner = null; wave.boss = null;
+  $('menuBest').textContent = bestScore > 0 ? 'En yüksek skor: ' + bestScore.toLocaleString('tr-TR') : '';
+  setState('menu', 'menu');
+}
+
+$('btnStart').addEventListener('click', newGame);
+$('btnResume').addEventListener('click', togglePause);
+$('btnRestart').addEventListener('click', newGame);
+$('btnRetry').addEventListener('click', newGame);
+$('btnWinRetry').addEventListener('click', newGame);
+for (const id of ['btnMenu1', 'btnMenu2', 'btnMenu3']) $(id).addEventListener('click', toMenu);
+$('btnPause').addEventListener('click', togglePause);
+$('btnPause').addEventListener('touchstart', e => { e.preventDefault(); togglePause(); }, { passive: false });
+
+/* =====================================================================
+   Ana döngü
+   ===================================================================== */
+let lastTime = performance.now();
+function frame(now) {
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (dt > 0.05) dt = 0.05; // sekme değişimi vb. sonrası büyük sıçramaları önle
+  if (dt < 0) dt = 0;
+  if (state === 'playing') update(dt);
+  else if (state === 'menu') { // menüde kamera yavaşça süzülür
+    menuTime += dt;
+    camX = WW / 2 + Math.cos(menuTime * 0.06) * 700; camY = WH / 2 + Math.sin(menuTime * 0.045) * 600;
+    clampCamera();
+    for (const t of world.trees) t.alpha = 1;
+  }
+  // zemin parçalarını boşta yavaş yavaş hazırla
+  if (world.chunkQueue.length) {
+    const idx = world.chunkQueue.pop();
+    if (!world.chunks[idx]) world.chunks[idx] = renderChunk(idx % CHUNK_COLS, (idx / CHUNK_COLS) | 0);
+  }
+  render();
+  requestAnimationFrame(frame);
+}
+
+// Başlat
+generateWorld();
+toMenu();
+requestAnimationFrame(frame);
+
+// Test/hata ayıklama için küçük bir kanca (oyunu etkilemez)
+window.ZD = {
+  get state() { return state; }, get player() { return player; }, get zombies() { return zombies; },
+  get wave() { return wave; }, get bullets() { return bullets; }, get score() { return score; },
+  startWave, chooseUpgrade, openUpgrade, newGame, update, render, CONFIG,
+  get cards() { return currentCards; }, input, sticks,
+};
+</script>
+</body>
+</html>
