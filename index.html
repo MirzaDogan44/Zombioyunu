@@ -3,175 +3,223 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#1d3319" />
+<meta name="theme-color" content="#1b2a1d" />
 <title>Zombi Dalgası</title>
+<link rel="icon" href="assets/ui/logo.png" />
 <style>
-  :root { --font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; }
+  /* Pixel UI pack 3'te font yok; piksel havası için sert gölgeli kalın sistem fontu kullanılıyor */
+  :root { --font: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; --u: 3px; }
+  @media (max-width: 720px), (max-height: 760px) { :root { --u: 2px; } }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
-    background: #1d3319; color: #fff; font-family: var(--font);
+    background: #1b2a1d; color: #fff; font-family: var(--font);
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     touch-action: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none;
+    cursor: url(assets/ui/cursors/arrow.png) 2 2, default;
   }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
-  /* Çentikli telefonlarda güvenli alanı okumak için görünmez eleman */
+  img, .pix { image-rendering: pixelated; image-rendering: crisp-edges; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
+    cursor: url(assets/ui/cursors/crosshair.png) 16 16, crosshair; }
   #safeProbe {
     position: fixed; visibility: hidden; pointer-events: none;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
+  button, .card { cursor: url(assets/ui/cursors/pointer.png) 10 2, pointer; font-family: var(--font); }
 
-  /* ---------- Ekran katmanları (menü, kart seçimi, duraklatma ...) ---------- */
+  /* ---------- Ekran katmanları ---------- */
   .overlay {
     position: fixed; inset: 0; z-index: 10; display: none;
-    flex-direction: column; align-items: center; justify-content: center; text-align: center;
-    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-    background: radial-gradient(ellipse at center, rgba(10, 22, 10, .55), rgba(4, 10, 4, .9));
+    flex-direction: column; align-items: center; justify-content: flex-start; text-align: center;
+    padding: max(66px, calc(env(safe-area-inset-top) + 60px)) 16px max(16px, env(safe-area-inset-bottom)); /* üstte ses/duraklat butonlarına yer */
+    background: rgba(8, 14, 10, .78);
     overflow-y: auto; touch-action: pan-y;
   }
-  .overlay.show { display: flex; animation: fadeIn .25s ease; }
+  .overlay.show { display: flex; animation: fadeIn .2s steps(4); }
+  .overlay > :first-child { margin-top: auto; }
+  .overlay > :last-child { margin-bottom: auto; }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 
+  /* Pixel UI pack 3 paneli (9-slice) */
+  .panel {
+    border-style: solid; border-color: transparent;
+    border-width: calc(var(--u) * 7);
+    border-image: url(assets/ui/panel.png) 7 fill / calc(var(--u) * 7) stretch;
+    image-rendering: pixelated;
+    padding: calc(var(--u) * 1) calc(var(--u) * 4);
+  }
+  .txtshadow, h1, h2, .btn, .stats, .sub, .card .nm {
+    text-shadow: var(--u) var(--u) 0 #000, calc(var(--u) * -1) var(--u) 0 #000, var(--u) calc(var(--u) * -1) 0 #000, calc(var(--u) * -1) calc(var(--u) * -1) 0 #000;
+  }
+  .logo { width: calc(var(--u) * 48); height: calc(var(--u) * 48); margin-bottom: calc(var(--u) * 3);
+    border: var(--u) solid #000; box-shadow: var(--u) var(--u) 0 #000; }
   .title {
-    font-size: clamp(46px, 11vw, 112px); line-height: .9; margin: 0 0 12px; font-weight: 900; letter-spacing: 2px;
-    color: #9be15d; transform: rotate(-3deg);
-    text-shadow: 0 4px 0 #2e5a1a, 0 8px 0 #1a3510, 0 14px 30px rgba(0, 0, 0, .6);
+    font-size: clamp(38px, min(9vw, 10vh), 92px); line-height: .95; margin: 0 0 10px; font-weight: 900; letter-spacing: 3px;
+    color: #8fe35f;
+    text-shadow: 4px 4px 0 #1e4a12, 8px 8px 0 #000;
   }
-  .title span { color: #ff5a4f; text-shadow: 0 4px 0 #7a1712, 0 8px 0 #4a0d0a, 0 14px 30px rgba(0, 0, 0, .6); }
-  .tagline { font-size: 18px; opacity: .85; margin: 6px 0 22px; }
-  h2.big { font-size: clamp(34px, 7vw, 64px); margin: 0 0 8px; font-weight: 900; letter-spacing: 2px; text-shadow: 0 5px 0 rgba(0,0,0,.45); }
-  .sub { font-size: 17px; opacity: .85; margin: 0 0 6px; }
-  .best { font-size: 15px; opacity: .7; margin-top: 14px; }
+  .title span { color: #ff5a4f; text-shadow: 4px 4px 0 #6e1410, 8px 8px 0 #000; }
+  .tagline { font-size: 17px; margin: 4px 0 16px; opacity: .92; }
+  h2.big { font-size: clamp(24px, 6.5vw, 56px); margin: 0 0 6px; font-weight: 900; letter-spacing: 3px; }
+  .sub { font-size: 17px; margin: 0 0 6px; }
+  .best { font-size: 15px; opacity: .75; margin-top: 12px; }
 
+  /* Pixel UI pack 3 butonu (9-slice) + hover efekti */
   .btn {
-    font-family: var(--font); font-size: 20px; font-weight: 800; color: #fff; letter-spacing: 1px;
-    background: linear-gradient(180deg, #5cc94a, #2f8f2a); border: none; border-radius: 14px;
-    padding: 13px 32px; margin: 6px; cursor: pointer;
-    box-shadow: 0 5px 0 #1d5e19, 0 10px 20px rgba(0, 0, 0, .4); transition: transform .1s, filter .1s;
+    font-size: 20px; font-weight: 900; color: #fff; letter-spacing: 1px; background: none;
+    border-style: solid; border-color: transparent; border-width: calc(var(--u) * 5);
+    border-image: url(assets/ui/btn_blue.png) 5 fill / calc(var(--u) * 5) stretch;
+    image-rendering: pixelated;
+    padding: 6px calc(var(--u) * 6); margin: 6px; min-width: 150px;
+    transition: transform .08s steps(2);
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
   }
-  .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
-  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #1d5e19; }
-  .btn.big { font-size: 28px; padding: 16px 60px; }
-  .btn.gray { background: linear-gradient(180deg, #6c7a89, #465462); box-shadow: 0 5px 0 #2b343d, 0 10px 20px rgba(0,0,0,.4); }
-  .btns { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+  .btn:hover, .btn:focus-visible { border-image-source: url(assets/ui/btn_orange.png); transform: translateY(-3px); outline: none; }
+  .btn:active { transform: translateY(2px); filter: brightness(.85); }
+  .btn.big { font-size: 26px; padding: 10px calc(var(--u) * 10); }
+  .btn.gray { border-image-source: url(assets/ui/btn_gray.png); }
+  .btn.gray:hover, .btn.gray:focus-visible { border-image-source: url(assets/ui/btn_orange.png); }
+  .btn img { width: 24px; height: 24px; }
+  .btns { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
 
-  .controls { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 24px; max-width: 760px; }
+  /* Menü görselleri (Menu paketi) */
+  .imgbtn { background: none; border: none; padding: 0; margin: 6px; transition: transform .08s steps(2); }
+  .imgbtn img { display: block; width: calc(var(--u) * 96); height: calc(var(--u) * 38); }
+  .imgbtn:hover, .imgbtn:focus-visible { transform: translateY(-4px) scale(1.04); filter: brightness(1.12); outline: none; }
+  .imgbtn:active { transform: translateY(2px); filter: brightness(.85); }
+  .upheader { width: calc(var(--u) * 64); height: calc(var(--u) * 29.33); margin-bottom: 4px; }
+
+  .controls { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 18px; max-width: 780px; }
   .controls .box {
-    background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .12); border-radius: 14px;
-    padding: 12px 18px; text-align: left; min-width: 260px;
+    border-style: solid; border-color: transparent; border-width: calc(var(--u) * 5);
+    border-image: url(assets/ui/menu_board.png) 5 fill / calc(var(--u) * 5) stretch;
+    image-rendering: pixelated;
+    padding: 8px 14px; text-align: left; min-width: 260px;
   }
-  .controls h3 { margin: 0 0 8px; font-size: 15px; color: #9be15d; letter-spacing: 1px; }
-  .controls p { margin: 5px 0; font-size: 14px; opacity: .92; }
+  .controls h3 { margin: 0 0 6px; font-size: 15px; color: #ffe08a; letter-spacing: 1px; text-shadow: 2px 2px 0 #000; }
+  .controls p { margin: 4px 0; font-size: 14px; text-shadow: 1px 1px 0 #000; }
   .key {
-    display: inline-block; background: #eee; color: #222; border-radius: 5px; padding: 1px 7px;
-    font-weight: 800; font-size: 12px; box-shadow: 0 2px 0 #999; margin-right: 3px;
+    display: inline-block; background: #e9e4d4; color: #222; padding: 0 6px; font-weight: 900; font-size: 12px;
+    border: 2px solid #000; box-shadow: 0 2px 0 #000; margin-right: 3px; text-shadow: none;
   }
 
-  .stats { font-size: 20px; line-height: 1.7; margin: 10px 0 4px; background: rgba(0,0,0,.35); padding: 12px 28px; border-radius: 14px; }
+  .stats { font-size: 19px; line-height: 1.65; margin: 10px 0 4px; min-width: 260px; }
   .stats b { color: #ffd43b; }
 
-  /* ---------- Özellik kartları ---------- */
-  #cards { display: flex; gap: 18px; justify-content: center; align-items: stretch; flex-wrap: wrap; margin: 18px 0 8px; }
+  /* ---------- Özellik kartları: Pixel UI pack 3 çerçeveleri, nadirliğe göre renk ---------- */
+  #cards { display: flex; gap: 16px; justify-content: center; align-items: stretch; flex-wrap: wrap; margin: 14px 0 8px; }
   .card {
-    --rc: #b8c2cc; --rg: rgba(184, 194, 204, .25);
-    width: 215px; min-height: 285px; border-radius: 16px; padding: 16px 14px;
-    background: linear-gradient(180deg, #2b3542, #171d26);
-    border: 3px solid var(--rc);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), 0 12px 30px rgba(0, 0, 0, .5), 0 0 24px var(--rg);
-    cursor: pointer; display: flex; flex-direction: column; align-items: center;
-    transition: transform .15s, box-shadow .15s; animation: cardIn .4s backwards;
+    width: 220px; min-height: 280px;
+    border-style: solid; border-color: transparent; border-width: calc(var(--u) * 6);
+    border-image: url(assets/ui/frame_green.png) 6 / calc(var(--u) * 6) stretch;
+    image-rendering: pixelated;
+    background: #1f232b; background-clip: border-box;
+    padding: 10px 10px; display: flex; flex-direction: column; align-items: center;
+    transition: transform .1s steps(2), filter .1s; animation: cardIn .3s steps(5) backwards;
   }
-  .card:nth-child(2) { animation-delay: .07s; }
-  .card:nth-child(3) { animation-delay: .14s; }
-  .card:hover { transform: translateY(-7px) scale(1.03); box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 16px 34px rgba(0,0,0,.55), 0 0 36px var(--rg); }
-  .card.rare { --rc: #4dabf7; --rg: rgba(77, 171, 247, .45); background: linear-gradient(180deg, #1d3557, #111c2e); }
-  .card.legendary { --rc: #ffc93c; --rg: rgba(255, 180, 40, .6); background: linear-gradient(180deg, #4a3510, #1f1606); animation: cardIn .4s backwards, legGlow 1.4s ease-in-out infinite alternate; }
-  @keyframes cardIn { from { opacity: 0; transform: translateY(30px) scale(.9); } to { opacity: 1; transform: none; } }
-  @keyframes legGlow { from { box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.5), 0 0 14px var(--rg); } to { box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.5), 0 0 40px var(--rg); } }
-  .card .ic { width: 88px; height: 88px; margin: 10px 0 8px; flex: none; }
+  .card:nth-child(2) { animation-delay: .06s; }
+  .card:nth-child(3) { animation-delay: .12s; }
+  .card:hover, .card:focus-visible { transform: translateY(-8px); filter: brightness(1.18); }
+  .card.rare { border-image-source: url(assets/ui/frame_cyan.png); background-color: #162436; }
+  .card.legendary { border-image-source: url(assets/ui/frame_orange.png); background-color: #33240c; animation: cardIn .3s steps(5) backwards, legGlow .8s steps(2) infinite alternate; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+  @keyframes legGlow { from { filter: drop-shadow(0 0 0 #ffb52e); } to { filter: drop-shadow(0 0 10px #ffb52e); } }
+  .card .ic { width: 96px; height: 96px; margin: 8px 0 6px; flex: none; image-rendering: pixelated; }
   .card .txt { display: flex; flex-direction: column; align-items: center; flex: 1; }
-  .card .rar { font-size: 12px; letter-spacing: 2px; font-weight: 900; color: var(--rc); }
-  .card .nm { font-size: 20px; font-weight: 800; margin-top: 2px; }
-  .card .ds { font-size: 14px; opacity: .88; margin-top: 8px; line-height: 1.35; }
-  .card .lv { margin-top: auto; padding-top: 10px; font-size: 12px; opacity: .65; }
-  .hint { font-size: 13px; opacity: .55; margin-top: 8px; }
+  .card .rar { font-size: 12px; letter-spacing: 2px; font-weight: 900; color: #8fe35f; text-shadow: 2px 2px 0 #000; }
+  .card.rare .rar { color: #4dd2ff; }
+  .card.legendary .rar { color: #ffb52e; }
+  .card .nm { font-size: 20px; font-weight: 900; margin-top: 2px; }
+  .card .ds { font-size: 14px; margin-top: 8px; line-height: 1.35; color: #e6e9ee; }
+  .card .lv { margin-top: auto; padding-top: 10px; font-size: 12px; opacity: .7; }
+  .hint { font-size: 13px; opacity: .6; margin-top: 8px; }
 
-  /* Dar ekranlarda kartlar yatay şerit olur */
   @media (max-width: 720px), (max-height: 520px) {
-    #cards { flex-direction: column; align-items: center; gap: 10px; width: 100%; margin: 10px 0 4px; }
-    .card { width: 100%; max-width: 460px; min-height: 0; flex-direction: row; text-align: left; padding: 10px 14px; gap: 12px; }
-    .card .ic { width: 62px; height: 62px; margin: 0; }
+    #cards { flex-direction: column; align-items: center; gap: 8px; width: 100%; margin: 8px 0 4px; }
+    .card { width: 100%; max-width: 460px; min-height: 0; flex-direction: row; text-align: left; padding: 6px 10px; gap: 12px; }
+    .card .ic { width: 64px; height: 64px; margin: 0; }
     .card .txt { align-items: flex-start; }
     .card .nm { font-size: 17px; }
-    .card .ds { font-size: 13px; margin-top: 3px; }
-    .card .lv { padding-top: 4px; margin-top: 2px; }
-    .card:hover { transform: scale(1.02); }
-    h2.big { font-size: 30px; }
+    .card .ds { font-size: 13px; margin-top: 2px; }
+    .card .lv { padding-top: 3px; margin-top: 2px; }
+    .card:hover { transform: translateX(4px); }
     .hint { display: none; }
+    .upheader { display: none; }
+    .controls .box { min-width: 0; width: 100%; max-width: 420px; }
   }
   @media (max-height: 520px) {
     #cards { flex-direction: row; flex-wrap: wrap; justify-content: center; }
     .card { max-width: 290px; }
     .card .ds { font-size: 12px; }
-    .controls { margin-top: 10px; }
-    .tagline { margin: 2px 0 10px; }
+    .controls { margin-top: 8px; }
+    .controls .box { width: auto; }
+    .logo { display: none; }
+    .tagline { margin: 2px 0 8px; }
   }
 
-  /* ---------- Duraklat butonu ---------- */
-  #btnPause {
-    position: fixed; z-index: 5; display: none; cursor: pointer; padding: 0;
-    top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right));
-    width: 44px; height: 44px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .45);
+  /* ---------- Sağ üst ikon butonları: ses ve duraklat ---------- */
+  .iconbtn {
+    position: fixed; z-index: 20; padding: 0; background: none;
+    top: calc(10px + env(safe-area-inset-top));
+    width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+    border-style: solid; border-color: transparent; border-width: 12px;
+    border-image: url(assets/ui/panel_dark.png) 6 fill / 12px stretch; image-rendering: pixelated;
+    transition: transform .08s steps(2);
   }
-  #btnPause::before, #btnPause::after { content: ''; position: absolute; top: 11px; width: 6px; height: 18px; background: #fff; border-radius: 2px; }
-  #btnPause::before { left: 12px; }
-  #btnPause::after { right: 12px; }
+  .iconbtn:hover { transform: translateY(-2px); filter: brightness(1.2); }
+  .iconbtn:active { transform: translateY(1px); }
+  .iconbtn img, .iconbtn canvas { width: 24px; height: 24px; image-rendering: pixelated; pointer-events: none; }
+  #btnMute { right: calc(10px + env(safe-area-inset-right)); }
+  #btnPause { right: calc(64px + env(safe-area-inset-right)); display: none; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="safeProbe"></div>
-<button id="btnPause" aria-label="Duraklat"></button>
+<button id="btnPause" class="iconbtn" aria-label="Duraklat" title="Duraklat (ESC)"><img src="assets/ui/pause.png" alt=""></button>
+<button id="btnMute" class="iconbtn" aria-label="Sesi aç/kapa" title="Sesi aç/kapa (M)"><canvas id="muteIcon" width="16" height="16"></canvas></button>
 
 <!-- Başlangıç ekranı -->
 <div id="menu" class="overlay show">
+  <img class="logo" src="assets/ui/logo.png" alt="">
   <h1 class="title">ZOMBİ<br><span>DALGASI</span></h1>
-  <p class="tagline">10 dalga boyunca hayatta kal, Dev Zombi'yi yen!</p>
-  <button id="btnStart" class="btn big">Başla</button>
+  <p class="tagline txtshadow">10 dalga boyunca hayatta kal, Dev Zombi'yi yen!</p>
+  <button id="btnStart" class="imgbtn" aria-label="Başla" title="Başla"><img src="assets/ui/play.png" alt="Başla"></button>
   <div class="controls">
     <div class="box">
       <h3>BİLGİSAYAR</h3>
       <p><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> / ok tuşları: hareket</p>
       <p><span class="key">Mouse</span> nişan al</p>
       <p><span class="key">Sol tık</span> ateş (basılı tut: sürekli)</p>
-      <p><span class="key">ESC</span> / <span class="key">P</span> duraklat</p>
+      <p><span class="key">ESC</span> / <span class="key">P</span> duraklat · <span class="key">M</span> ses</p>
     </div>
     <div class="box">
       <h3>TELEFON / TABLET</h3>
       <p>Sol alt joystick: hareket</p>
       <p>Sağ alt joystick: nişan al ve ateş et</p>
-      <p>Sağ üstteki <b>II</b> butonu: duraklat</p>
+      <p>Sağ üstteki butonlar: duraklat ve ses</p>
       <p>Kartlara dokunarak özellik seç</p>
     </div>
   </div>
-  <div class="best" id="menuBest"></div>
+  <div class="best txtshadow" id="menuBest"></div>
 </div>
 
 <!-- Özellik seçim ekranı -->
 <div id="upgrade" class="overlay">
+  <img class="upheader" src="assets/ui/upgrade.png" alt="">
   <h2 class="big" id="upTitle">Özellik Seç</h2>
   <p class="sub" id="upSub"></p>
   <div id="cards"></div>
-  <p class="hint">Klavyeden 1 / 2 / 3 tuşlarıyla da seçebilirsin</p>
+  <p class="hint txtshadow">Klavyeden 1 / 2 / 3 tuşlarıyla da seçebilirsin</p>
 </div>
 
 <!-- Duraklatma ekranı -->
 <div id="pause" class="overlay">
   <h2 class="big">DURAKLATILDI</h2>
   <div class="btns">
-    <button id="btnResume" class="btn">Devam Et</button>
+    <button id="btnResume" class="btn"><img src="assets/ui/resume.png" alt="">Devam Et</button>
     <button id="btnRestart" class="btn gray">Yeniden Başla</button>
-    <button id="btnMenu1" class="btn gray">Ana Menü</button>
+    <button id="btnMenu1" class="btn gray"><img src="assets/ui/exit.png" alt="">Ana Menü</button>
   </div>
 </div>
 
@@ -179,10 +227,10 @@
 <div id="gameover" class="overlay">
   <h2 class="big" style="color:#ff5a4f">ÖLDÜN!</h2>
   <p class="sub">Zombiler seni yakaladı...</p>
-  <div class="stats" id="goStats"></div>
+  <div class="stats panel" id="goStats"></div>
   <div class="btns">
     <button id="btnRetry" class="btn big">Tekrar Oyna</button>
-    <button id="btnMenu2" class="btn gray">Ana Menü</button>
+    <button id="btnMenu2" class="btn gray"><img src="assets/ui/exit.png" alt="">Ana Menü</button>
   </div>
 </div>
 
@@ -190,10 +238,10 @@
 <div id="win" class="overlay">
   <h2 class="big" style="color:#ffd43b">TEBRİKLER!</h2>
   <p class="sub">10 dalganın hepsini atlattın ve Dev Zombi'yi yendin!</p>
-  <div class="stats" id="winStats"></div>
+  <div class="stats panel" id="winStats"></div>
   <div class="btns">
     <button id="btnWinRetry" class="btn big">Tekrar Oyna</button>
-    <button id="btnMenu3" class="btn gray">Ana Menü</button>
+    <button id="btnMenu3" class="btn gray"><img src="assets/ui/exit.png" alt="">Ana Menü</button>
   </div>
 </div>
 
@@ -210,14 +258,14 @@ const CONFIG = {
     edgeMargin: 100,             // harita kenarında engelsiz bırakılan şerit (zombiler buradan gelir)
     obstacleGap: 100,            // engeller arasındaki en az boşluk (büyük zombiler de geçebilsin)
     trees: 1.0,                  // ağaç yoğunluğu çarpanı
-    rocks: 45, fences: 14, signs: 12, bushes: 150, flowers: 120,
+    rocks: 40, fences: 14, signs: 12, bushes: 110, flowers: 140, graves: 24,
   },
   camera: {
     followSharpness: 6,          // kameranın takip yumuşaklığı (büyük = daha sıkı)
     viewWorldSize: 1100,         // ekranın uzun kenarında görünen dünya genişliği
     minScale: 0.5, maxScale: 1.25,
-    edgeOverscroll: 110,
-    phoneShortSide: 440,         // telefonda kısa kenarda görünen en fazla dünya genişliği         // kamera harita dışını ne kadar gösterebilir
+    edgeOverscroll: 110,         // kamera harita dışını ne kadar gösterebilir
+    phoneShortSide: 440,         // telefonda kısa kenarda görünen en fazla dünya genişliği
   },
   player: {
     maxHp: 100,
@@ -226,23 +274,46 @@ const CONFIG = {
     damage: 10,                  // mermi başı hasar
     bulletSpeed: 850,
     bulletRange: 700,
-    radius: 16,
+    radius: 15,                  // çarpışma yarıçapı (ayaklarda; sprite gövdesine göre)
     invulnTime: 0.5,             // hasar sonrası ölümsüzlük (saniye)
     critMultiplier: 2,           // kritik vuruş çarpanı
     baseKnockback: 140,          // mermilerin temel geri tepme gücü
     bladeDamage: 16, bladeRadius: 78, bladeSpeed: 3.4, bladeHitCooldown: 0.35,
   },
   zombies: {
+    // radius: ayaktaki çarpışma yarıçapı, hitRadius/hitLift: mermi isabet alanı (gövdenin ortası)
     //        can   hız  yarıçap hasar puan  kütle
-    normal: { hp: 30,  speed: 78,  radius: 16, damage: 10, score: 10,  mass: 1 },
-    runner: { hp: 16,  speed: 138, radius: 13, damage: 8,  score: 15,  mass: 0.7 },
-    tank:   { hp: 160, speed: 42,  radius: 27, damage: 22, score: 40,  mass: 3.5 },
+    normal: { hp: 30,  speed: 78,  radius: 16, damage: 10, score: 10,  mass: 1,   hitRadius: 18, hitLift: 30 },
+    runner: { hp: 16,  speed: 138, radius: 14, damage: 8,  score: 15,  mass: 0.7, hitRadius: 16, hitLift: 18 },
+    tank:   { hp: 160, speed: 42,  radius: 24, damage: 22, score: 40,  mass: 3.5, hitRadius: 26, hitLift: 42 },
     boss: {
-      hp: 3200, speed: 64, radius: 50, damage: 30, score: 1000, mass: 25,
+      hp: 3200, speed: 64, radius: 44, damage: 30, score: 1000, mass: 25, hitRadius: 44, hitLift: 70,
       dashCooldownMin: 3.2, dashCooldownMax: 5.5, // atılma saldırıları arası süre
       dashWindup: 0.8,                            // atılmadan önce uyarı süresi
       dashSpeed: 600, dashDuration: 0.55, dashRange: 650, recoverTime: 0.6,
     },
+  },
+  // Sprite ölçekleri: 1 sanat pikseli kaç dünya pikseli olarak çizilsin
+  sprites: {
+    player: 3,
+    normal: 2.4, runner: 3.2, tank: 3.4, boss: 5.6,
+    trees: 1.3, bushes: 0.5, rocks: [0.5, 0.8], fence: 0.5, grave: 2.2,
+    groundPixel: 2,              // zemin piksellerinin boyutu
+    bullet: 0.75, muzzle: 1.2,
+  },
+  // Kodla yapılan zombi animasyonu (sinüs zıplama + squash & stretch + sallanma)
+  anim: {
+    //          hops/sn  zıplama(px)  ezilme/uzama  sallanma(radyan)
+    normal: { freq: 2.2, bob: 5, squash: 0.10, sway: 0.10 },
+    runner: { freq: 4.4, bob: 4, squash: 0.12, sway: 0.16 },
+    tank:   { freq: 1.3, bob: 4, squash: 0.14, sway: 0.06 },
+    boss:   { freq: 1.0, bob: 8, squash: 0.10, sway: 0.05 },
+    idleFactor: 0.3,             // dururken animasyon hızı çarpanı
+    playerFrameRate: 9,          // oyuncu yürüme karesi hızı
+  },
+  audio: {
+    master: 0.8, music: 0.3,
+    sfx: { shoot: 0.10, hit: 0.35, death: 0.22, bossDeath: 0.8, hurt: 0.7, wave: 0.55, clear: 0.55, pick: 0.6, click: 0.5, dash: 0.6, explode: 0.15 },
   },
   waves: {
     total: 10,
@@ -326,6 +397,144 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 resize();
 
 /* =====================================================================
+   Asset'ler: görseller önceden yüklenir. Bir görsel yüklenemezse oyun o
+   nesneyi eski kod-çizimiyle gösterir (assets/ klasörü olmadan da çalışır).
+   Not: file:// ile açılınca görseller canvas'a sadece çizilir, piksel okunmaz.
+   ===================================================================== */
+const ASSET_FILES = {
+  player1: 'assets/player/player1.png', player2: 'assets/player/player2.png', player3: 'assets/player/player3.png',
+  bullet: 'assets/player/bullet.png', bulletRing: 'assets/player/bullet_ring.png', muzzle: 'assets/player/muzzle.png',
+  zpack: 'assets/zombies/zombie_pack.png', runner1: 'assets/zombies/runner1.png', runner2: 'assets/zombies/runner2.png',
+  env: 'assets/map/environment.png', fence: 'assets/map/fence.png', grave: 'assets/map/grave.png',
+  panel: 'assets/ui/panel.png', panelDark: 'assets/ui/panel_dark.png',
+  barFrame: 'assets/ui/bar_frame.png', barRed: 'assets/ui/bar_red.png', barYellow: 'assets/ui/bar_yellow.png', barGreen: 'assets/ui/bar_green.png',
+  zbarFrame: 'assets/ui/zbar_frame.png', zbarRed: 'assets/ui/zbar_red.png', zbarYellow: 'assets/ui/zbar_yellow.png', zbarGreen: 'assets/ui/zbar_green.png',
+  heart: 'assets/ui/heart.png', knobRed: 'assets/ui/knob_red.png', knobGreen: 'assets/ui/knob_green.png', shootIcon: 'assets/ui/shoot.png',
+  iconHealth: 'assets/icons/health.png', iconFire: 'assets/icons/fire.png', iconSpeed: 'assets/icons/speed.png',
+};
+const IMG = {};
+let assetsPending = 0;
+const imgOk = im => !!(im && im.complete && im.naturalWidth > 0);
+// Vuruş anında beyaz / hasar anında kırmızı parlama için sprite'ın tek renkli kopyası
+const TINT = {};
+function makeTint(key, color) {
+  const im = IMG[key];
+  if (!imgOk(im)) return;
+  const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const g = c.getContext('2d');
+  g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
+  TINT[key + color] = c;
+}
+function loadAssets(onDone) {
+  for (const [k, src] of Object.entries(ASSET_FILES)) {
+    const im = new Image();
+    assetsPending++;
+    im.onload = im.onerror = () => { if (--assetsPending === 0) onDone(); };
+    im.src = src;
+    IMG[k] = im;
+  }
+}
+function onAssetsReady() {
+  for (const k of ['player1', 'player2', 'player3']) makeTint(k, '#ff3030');
+  for (const k of ['zpack', 'runner1', 'runner2']) { makeTint(k, '#ffffff'); makeTint(k, '#ff2020'); }
+  iconCacheClear();
+}
+
+// Sprite tanımları (kaynak dikdörtgenleri; ax/ay = ayak noktası)
+const ENV = {
+  pineBig:  { sx: 7,   sy: 137, sw: 88,  sh: 119, ax: 44,   trunk: 13 },
+  pineA:    { sx: 105, sy: 272, sw: 47,  sh: 112, ax: 22.5, trunk: 10 },
+  pineB:    { sx: 202, sy: 272, sw: 47,  sh: 112, ax: 21.5, trunk: 10 },
+  deadTree: { sx: 294, sy: 276, sw: 59,  sh: 108, ax: 25.5, trunk: 7 },
+  rock:     { sx: 400, sy: 171, sw: 101, sh: 69 },
+  agaveA:   { sx: 130, sy: 47,  sw: 93,  sh: 81 },
+  agaveB:   { sx: 226, sy: 59,  sw: 92,  sh: 69 },
+  coralR:   { sx: 130, sy: 199, sw: 57,  sh: 57 },
+  coralO:   { sx: 197, sy: 211, sw: 56,  sh: 45 },
+  coralP:   { sx: 262, sy: 216, sw: 50,  sh: 40 },
+};
+// ZombiePack (8x8 ızgara, 32px). Uyumlu olanlar seçildi: itfaiyeciler tank, korsan kaptan boss.
+const ZPACK_TANK = [16, 38];
+const ZPACK_BOSS = 51;
+const ZPACK_NORMAL = Array.from({ length: 64 }, (_, i) => i).filter(i => !ZPACK_TANK.includes(i) && i !== 51 && i !== 52);
+
+/* =====================================================================
+   Ses: Audio klasöründeki sesler + ateş için kodla üretilen kısa "pew".
+   ===================================================================== */
+const Sound = {
+  muted: false, actx: null, music: null, pools: {}, lastPlay: {},
+  files: {
+    click: 'assets/audio/click.wav', hit: 'assets/audio/step.wav', death: 'assets/audio/explosion1.wav',
+    bossDeath: 'assets/audio/explosion2.wav', explode: 'assets/audio/explosion2.wav', hurt: 'assets/audio/hurt.wav',
+    wave: 'assets/audio/powerup1.wav', clear: 'assets/audio/powerup2.wav', pick: 'assets/audio/powerup2.wav', dash: 'assets/audio/jump.wav',
+  },
+  init() {
+    try { this.muted = localStorage.getItem('zombiDalgasi_muted') === '1'; } catch (e) {}
+    for (const [name, src] of Object.entries(this.files)) {
+      const n = (name === 'hit' || name === 'death') ? 6 : 3;
+      this.pools[name] = { i: 0, list: Array.from({ length: n }, () => { const a = new Audio(src); a.preload = 'auto'; return a; }) };
+    }
+    this.music = new Audio('assets/audio/music.mp3');
+    this.music.loop = true; this.music.preload = 'auto';
+  },
+  // Tarayıcılar sesi ilk dokunuş/tıklamadan sonra açar
+  unlock() {
+    if (!this.actx) { try { this.actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.actx = null; } }
+    if (this.actx && this.actx.state === 'suspended') this.actx.resume();
+    this.updateMusic();
+  },
+  play(name, minGap = 0.03) {
+    if (this.muted) return;
+    const now = performance.now() / 1000;
+    if (now - (this.lastPlay[name] || 0) < minGap) return;
+    this.lastPlay[name] = now;
+    const pool = this.pools[name];
+    if (!pool) return;
+    const a = pool.list[pool.i++ % pool.list.length];
+    try { a.volume = clamp(C.audio.master * (C.audio.sfx[name] ?? 0.5), 0, 1); a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) {}
+  },
+  // Ateş sesi için asset yok: Web Audio ile kısa bir lazer/tabanca sesi üret
+  shoot() {
+    if (this.muted || !this.actx) return;
+    const now = performance.now() / 1000;
+    if (now - (this.lastPlay.shoot || 0) < 0.05) return;
+    this.lastPlay.shoot = now;
+    const t = this.actx.currentTime, o = this.actx.createOscillator(), g = this.actx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(rand(820, 980), t); o.frequency.exponentialRampToValueAtTime(140, t + 0.09);
+    g.gain.setValueAtTime(C.audio.master * C.audio.sfx.shoot, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    o.connect(g); g.connect(this.actx.destination); o.start(t); o.stop(t + 0.11);
+  },
+  updateMusic() {
+    if (!this.music) return;
+    const want = !this.muted && (state === 'playing' || state === 'upgrade') && !!this.actx;
+    this.music.volume = clamp(C.audio.master * C.audio.music, 0, 1);
+    if (want && this.music.paused) { const p = this.music.play(); if (p) p.catch(() => {}); }
+    else if (!want && !this.music.paused) this.music.pause();
+  },
+  toggleMute() {
+    this.muted = !this.muted;
+    try { localStorage.setItem('zombiDalgasi_muted', this.muted ? '1' : '0'); } catch (e) {}
+    this.unlock(); this.updateMusic(); drawMuteIcon();
+  },
+};
+// Ses butonu simgesi: asset yok, piksel piksel kodla çiziliyor
+function drawMuteIcon() {
+  const g = $('muteIcon').getContext('2d');
+  g.clearRect(0, 0, 16, 16);
+  const px = (x, y, c, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+  // hoparlör
+  px(1, 5, '#000', 5, 6); px(2, 6, '#fff', 3, 4);
+  for (let i = 0; i < 4; i++) { px(5 + i, 4 - i, '#000', 1, 8 + i * 2); px(5 + i, 5 - i, '#fff', 1, 6 + i * 2); }
+  px(9, 1, '#000', 1, 14);
+  if (Sound.muted) { // kırmızı çarpı
+    for (let i = 0; i < 5; i++) { px(10 + i, 5 + i, '#f54025', 1, 1); px(14 - i, 5 + i, '#f54025', 1, 1); }
+  } else { // ses dalgaları
+    px(11, 6, '#fff', 1, 4); px(13, 4, '#fff', 1, 8); px(12, 5, '#fff'); px(12, 10, '#fff'); px(14, 3, '#fff'); px(14, 12, '#fff');
+  }
+}
+
+/* =====================================================================
    Oyun durumu
    ===================================================================== */
 let state = 'menu'; // menu | upgrade | playing | paused | gameover | win
@@ -368,6 +577,7 @@ window.addEventListener('keydown', e => {
     if (currentCards[i]) chooseUpgrade(currentCards[i]);
   }
   if ((state === 'menu') && (e.code === 'Enter' || e.code === 'Space')) newGame();
+  if (e.code === 'KeyM') Sound.toggleMute();
 });
 window.addEventListener('keyup', e => keys.delete(e.code));
 window.addEventListener('blur', () => { releaseInputs(); if (state === 'playing') togglePause(); });
@@ -431,22 +641,26 @@ canvas.addEventListener('touchend', onTouchEnd, { passive: false });
 canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
 /* =====================================================================
-   Dünya: engeller (ağaç, kaya, çit) ve dekor (çalı, çiçek, tabela)
+   Dünya: engeller (ağaç, kaya, çit) ve dekor (çalı, mezar, tabela, çiçek)
+   Ağaçlar/kayalar FreeEnvironment, çit Background/Fances, mezar Zombie/Grave.
+   Nesneler "2.5D" çizilir: Y'ye göre sıralanır, çarpışma ayak/gövde dibindedir.
    ===================================================================== */
 const world = {
-  obstacles: [], trees: [], rocks: [], fences: [], signs: [], bushes: [], flowers: [], patches: [], border: [],
-  seed: 1, chunks: [], chunkQueue: [],
+  obstacles: [], trees: [], rocks: [], fences: [], signs: [], bushes: [], graves: [], flowers: [], border: [],
+  seed: 1, chunks: [], chunkQueue: [], statics: [],
 };
 const CHUNK = 500;
 const CHUNK_COLS = Math.ceil(WW / CHUNK), CHUNK_ROWS = Math.ceil(WH / CHUNK);
 
-const TREE_PALETTES = [
+const TREE_PALETTES = [ // sadece kod-çizimi yedeği için
   { dark: '#2d6a2e', mid: '#3e8a3a', light: '#5cab4b' },
   { dark: '#27593a', mid: '#347748', light: '#4f985d' },
   { dark: '#3b6a22', mid: '#4f8a2d', light: '#6eaa3f' },
 ];
 const SIGN_TEXTS = ['TEHLİKE!', 'DİKKAT', 'KÖY →', '← ORMAN', 'KAÇ!', 'ÇIKIŞ YOK', 'ZOMBİ VAR', 'GERİ DÖN'];
 const FLOWER_COLORS = ['#ff6b9a', '#ffd43b', '#ffffff', '#b197fc', '#ff8787', '#74c0fc'];
+const TREE_KINDS = ['pineBig', 'pineBig', 'pineA', 'pineB', 'pineA', 'pineB', 'deadTree'];
+const BUSH_KINDS = ['agaveA', 'agaveB', 'agaveA', 'agaveB', 'coralR', 'coralO', 'coralP'];
 
 // Bir çember engel için yer uygun mu?
 function circleRectDist(cx, cy, o) {
@@ -487,42 +701,42 @@ function nearObstacle(x, y, r) {
   }
   return false;
 }
+function makeTree(kind, x, y, s) {
+  const d = ENV[kind];
+  return { shape: 'c', kind: 'tree', dk: 'tree', def: d, x, y, s, r: Math.max(12, d.trunk * s + 3), sortY: y,
+           w: d.sw * s, h: d.sh * s, alpha: 1, cr: d.sw * s * 0.5,
+           // yedek kod-çizimi için
+           blobs: [{ dx: 0, dy: -d.sh * s * 0.55, r: d.sw * s * 0.45 }], pal: pick(TREE_PALETTES) };
+}
 
 function generateWorld() {
   world.obstacles = []; world.trees = []; world.rocks = []; world.fences = []; world.signs = [];
-  world.bushes = []; world.flowers = []; world.patches = []; world.border = [];
+  world.bushes = []; world.graves = []; world.flowers = []; world.border = [];
   world.seed = (Math.random() * 1e9) | 0;
-  // eski zemin parçalarını serbest bırak
   for (const ch of world.chunks) if (ch) { ch.width = 0; ch.height = 0; }
   world.chunks = new Array(CHUNK_COLS * CHUNK_ROWS).fill(null);
   world.chunkQueue = [];
   for (let i = 0; i < world.chunks.length; i++) world.chunkQueue.push(i);
+  const S = C.sprites;
 
-  // --- Çitler (önce büyük olanlar yerleşir) ---
+  // --- Demir çitler (yatay; önce büyük olanlar yerleşir) ---
+  const segW = 127 * S.fence;
   for (let n = 0, tries = 0; n < C.world.fences && tries < 400; tries++) {
-    const horiz = Math.random() < 0.5, len = rand(140, 280), th = 12;
-    const w = horiz ? len : th, h = horiz ? th : len;
+    const segs = randInt(2, 4), w = segs * segW, h = 12;
     const x = rand(0, WW - w), y = rand(0, WH - h);
     if (!canPlaceRect(x, y, w, h)) continue;
-    const f = { shape: 'r', kind: 'fence', x, y, w, h, horiz };
+    const f = { shape: 'r', kind: 'fence', dk: 'fence', x, y, w, h, horiz: true, segs, sortY: y + h };
     world.obstacles.push(f); world.fences.push(f); n++;
   }
   // --- Ağaçlar: dengeli dağılım için ızgara + rastgele kaydırma ---
   const cell = 300;
   for (let gx = 0; gx < WW / cell; gx++) for (let gy = 0; gy < WH / cell; gy++) {
-    const count = Math.random() < 0.3 * C.world.trees ? 2 : (Math.random() < C.world.trees ? 1 : 0);
+    const count = Math.random() < 0.4 * C.world.trees ? 2 : (Math.random() < C.world.trees ? 1 : 0);
     for (let k = 0; k < count; k++) {
       for (let t = 0; t < 10; t++) {
-        const x = gx * cell + rand(20, cell - 20), y = gy * cell + rand(20, cell - 20);
-        const cr = rand(40, 64), r = cr * 0.46;
-        if (!canPlaceCircle(x, y, r)) continue;
-        const blobs = [{ dx: 0, dy: 0, r: cr * 0.62 }];
-        const nb = randInt(5, 7), off = rand(0, TAU);
-        for (let b = 0; b < nb; b++) {
-          const a = off + b * TAU / nb + rand(-0.25, 0.25), dd = cr * rand(0.38, 0.5);
-          blobs.push({ dx: Math.cos(a) * dd, dy: Math.sin(a) * dd, r: cr * rand(0.42, 0.56) });
-        }
-        const tree = { shape: 'c', kind: 'tree', x, y, r, cr, blobs, pal: pick(TREE_PALETTES), alpha: 1 };
+        const kind = pick(TREE_KINDS), s = S.trees * rand(0.9, 1.12);
+        const tree = makeTree(kind, gx * cell + rand(20, cell - 20), gy * cell + rand(20, cell - 20), s);
+        if (!canPlaceCircle(tree.x, tree.y, tree.r)) continue;
         world.obstacles.push(tree); world.trees.push(tree);
         break;
       }
@@ -530,120 +744,126 @@ function generateWorld() {
   }
   // --- Kayalar ---
   for (let n = 0, tries = 0; n < C.world.rocks && tries < 2000; tries++) {
-    const x = rand(0, WW), y = rand(0, WH), r = rand(16, 32);
+    const s = rand(S.rocks[0], S.rocks[1]), r = ENV.rock.sw * s * 0.36;
+    const x = rand(0, WW), y = rand(0, WH);
     if (!canPlaceCircle(x, y, r)) continue;
+    // yedek kod-çizimi için çokgen
     const pts = [], np = randInt(7, 10);
     for (let i = 0; i < np; i++) { const a = i / np * TAU; const d = r * rand(0.95, 1.25); pts.push([Math.cos(a) * d, Math.sin(a) * d]); }
-    const shade = randInt(0, 2);
-    const rock = { shape: 'c', kind: 'rock', x, y, r, pts,
-      c1: ['#8a8f96', '#7d838b', '#959aa0'][shade], c2: ['#a9aeb4', '#9ca2a9', '#b4b9be'][shade] };
+    const rock = { shape: 'c', kind: 'rock', dk: 'rock', x, y, r, s, sortY: y + r * 0.35, pts, c1: '#8a8f96', c2: '#a9aeb4', flip: Math.random() < 0.5 };
     world.obstacles.push(rock); world.rocks.push(rock); n++;
   }
-  // --- Tahta tabelalar (dekor) ---
-  world.signs.push({ x: WW / 2 + 95, y: WH / 2 - 120, rot: -0.12, text: 'HAYATTA KAL!' });
+  // --- Tahta tabelalar (dekor, kodla çizilir: pakette tabela yok) ---
+  world.signs.push({ dk: 'sign', x: WW / 2 + 95, y: WH / 2 - 110, sortY: WH / 2 - 110, rot: -0.05, text: 'HAYATTA KAL!' });
   for (let n = 0, tries = 0; n < C.world.signs && tries < 500; tries++) {
     const x = rand(150, WW - 150), y = rand(150, WH - 150);
     if (Math.hypot(x - WW / 2, y - WH / 2) < C.world.safeRadius) continue;
-    if (nearObstacle(x, y, 50)) continue;
-    world.signs.push({ x, y, rot: rand(-0.3, 0.3), text: pick(SIGN_TEXTS) }); n++;
+    if (nearObstacle(x, y, 60)) continue;
+    world.signs.push({ dk: 'sign', x, y, sortY: y, rot: rand(-0.12, 0.12), text: pick(SIGN_TEXTS) }); n++;
   }
   // --- Çalılar (dekor, engel değil) ---
   for (let n = 0, tries = 0; n < C.world.bushes && tries < 3000; tries++) {
-    const x = rand(30, WW - 30), y = rand(30, WH - 30), r = rand(14, 26);
+    const x = rand(30, WW - 30), y = rand(30, WH - 30);
     if (Math.hypot(x - WW / 2, y - WH / 2) < C.world.safeRadius * 0.6) continue;
-    if (nearObstacle(x, y, r + 14)) continue;
-    const blobs = [];
-    const nb = randInt(3, 5);
-    for (let b = 0; b < nb; b++) { const a = rand(0, TAU), d = rand(0, r * 0.6); blobs.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d, r: r * rand(0.5, 0.75) }); }
-    const berries = Math.random() < 0.35 ? Array.from({ length: randInt(3, 6) }, () => ({ dx: rand(-r * 0.7, r * 0.7), dy: rand(-r * 0.7, r * 0.7) })) : null;
-    world.bushes.push({ x, y, r, blobs, berries, dark: pick(['#2f6f2c', '#326a34', '#3a7a2a']), light: pick(['#4f9a3e', '#58a548', '#4c9450']) });
+    if (nearObstacle(x, y, 40)) continue;
+    const kind = pick(BUSH_KINDS), s = S.bushes * rand(0.8, 1.15) * (kind.startsWith('coral') ? 0.85 : 1);
+    world.bushes.push({ dk: 'bush', def: ENV[kind], x, y, s, sortY: y, flip: Math.random() < 0.5, r: ENV[kind].sw * s * 0.4,
+      blobs: [{ dx: 0, dy: -10, r: 14 }], dark: '#2f6f2c', light: '#4f9a3e', berries: null });
     n++;
   }
-  // --- Çiçek öbekleri (zemine çizilir) ---
+  // --- Mezar taşları (dekor) ---
+  for (let n = 0, tries = 0; n < C.world.graves && tries < 1000; tries++) {
+    const x = rand(80, WW - 80), y = rand(80, WH - 80);
+    if (Math.hypot(x - WW / 2, y - WH / 2) < C.world.safeRadius * 0.8) continue;
+    if (nearObstacle(x, y, 50)) continue;
+    world.graves.push({ dk: 'grave', x, y, sortY: y, flip: Math.random() < 0.5 }); n++;
+  }
+  // --- Çiçek öbekleri (zemine piksel olarak işlenir) ---
   for (let n = 0; n < C.world.flowers; n++) {
     const x = rand(40, WW - 40), y = rand(40, WH - 40);
     if (nearObstacle(x, y, 30)) continue;
     const col = pick(FLOWER_COLORS), fl = [];
-    const cnt = randInt(5, 10);
+    const cnt = randInt(4, 9);
     for (let i = 0; i < cnt; i++) fl.push({ dx: rand(-22, 22), dy: rand(-16, 16), c: Math.random() < 0.8 ? col : pick(FLOWER_COLORS) });
     world.flowers.push({ x, y, fl });
   }
-  // --- Zemin lekeleri (açık/koyu çimen, toprak) ---
-  for (let n = 0; n < 80; n++) {
-    world.patches.push({ x: rand(0, WW), y: rand(0, WH), r: rand(80, 230), c: Math.random() < 0.5 ? 'rgba(130,190,85,0.35)' : 'rgba(70,125,45,0.32)' });
-  }
-  for (let n = 0; n < 16; n++) world.patches.push({ x: rand(200, WW - 200), y: rand(200, WH - 200), r: rand(35, 85), c: 'rgba(140,115,70,0.38)' });
   // --- Harita dışındaki sık orman sınırı ---
-  for (let x = -60; x <= WW + 60; x += 46) {
-    world.border.push({ x: x + rand(-8, 8), y: -rand(18, 45), r: rand(34, 54) });
-    world.border.push({ x: x + rand(-8, 8), y: WH + rand(18, 45), r: rand(34, 54) });
-  }
-  for (let y = -60; y <= WH + 60; y += 46) {
-    world.border.push({ x: -rand(18, 45), y: y + rand(-8, 8), r: rand(34, 54) });
-    world.border.push({ x: WW + rand(18, 45), y: y + rand(-8, 8), r: rand(34, 54) });
-  }
+  const addBorder = (x, y) => { const t = makeTree(pick(['pineBig', 'pineA', 'pineB', 'pineBig']), x, y, S.trees * rand(0.95, 1.2)); t.dk = 'tree'; world.border.push(t); };
+  for (let x = -80; x <= WW + 80; x += rand(38, 55)) { addBorder(x, -rand(8, 60)); addBorder(x, WH + rand(30, 90)); }
+  for (let y = -40; y <= WH + 80; y += rand(34, 50)) { addBorder(-rand(20, 70), y); addBorder(WW + rand(20, 70), y); }
+
+  // Y-sıralı çizim için tüm sabit nesneler tek listede
+  world.statics = [...world.trees, ...world.rocks, ...world.fences, ...world.signs, ...world.bushes, ...world.graves, ...world.border];
 
   buildObstacleGrid();
   buildNav();
   zgInit();
 }
 
-/* ---------- Zemin, 500x500'lük parçalar halinde önceden çizilir (performans) ---------- */
+/* ---------- Zemin: Tilemap paketi zemin karosu değil (fare imleci paketi), bu yüzden
+   çimen piksel piksel üretilir. 500x500'lük parçalar düşük çözünürlükte hazırlanıp
+   pikselli büyütülür; gürültü dünya koordinatından hesaplandığı için dikiş yok. ---------- */
+function hash2(x, y, s) {
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 1442695041) + world.seed) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function vnoise(x, y, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s), c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
+  return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+}
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16 - 0.5);
+const GRASS = [[0x3b, 0x66, 0x33], [0x45, 0x75, 0x39], [0x4f, 0x83, 0x3f], [0x5a, 0x90, 0x46]];
+const DIRT = [[0x5e, 0x50, 0x36], [0x6e, 0x5e, 0x3f], [0x7d, 0x6b, 0x48]];
+const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
 function renderChunk(ci, cj) {
-  const c = document.createElement('canvas');
-  c.width = CHUNK + 2; c.height = CHUNK + 2;
+  const GP = C.sprites.groundPixel, n = Math.ceil(CHUNK / GP) + 1; // +1: komşu parçayla dikişsiz örtüşme
+  const c = document.createElement('canvas'); c.width = n; c.height = n;
   const g = c.getContext('2d');
-  const ox = ci * CHUNK, oy = cj * CHUNK;
-  g.translate(-ox + 1, -oy + 1);
-  g.fillStyle = '#62a043';
-  g.fillRect(ox - 1, oy - 1, CHUNK + 2, CHUNK + 2);
-  // yumuşak lekeler
-  for (const p of world.patches) {
-    if (p.x + p.r < ox || p.x - p.r > ox + CHUNK || p.y + p.r < oy || p.y - p.r > oy + CHUNK) continue;
-    const gr = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-    gr.addColorStop(0, p.c); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr; g.beginPath(); g.arc(p.x, p.y, p.r, 0, TAU); g.fill();
-  }
-  // çimen çizgileri (renk başına tek yol = hızlı)
-  const rng = mulberry32(world.seed ^ (ci * 73856093) ^ (cj * 19349663));
-  const cols = ['#4f8a33', '#76b651', '#88c45f', '#5a9a3a'];
-  g.lineWidth = 1.4; g.lineCap = 'round';
-  for (let k = 0; k < cols.length; k++) {
-    g.strokeStyle = cols[k]; g.beginPath();
-    for (let i = 0; i < 260; i++) {
-      const x = ox + 4 + rng() * (CHUNK - 8), y = oy + 8 + rng() * (CHUNK - 12);
-      const h = 3 + rng() * 5;
-      g.moveTo(x, y); g.lineTo(x - 1.5, y - h);
-      g.moveTo(x + 2, y); g.lineTo(x + 3, y - h * 0.8);
+  const img = g.createImageData(n, n), d = img.data;
+  const gx0 = Math.round(ci * CHUNK / GP), gy0 = Math.round(cj * CHUNK / GP);
+  const set = (x, y, rgb) => { if (x < 0 || y < 0 || x >= n || y >= n) return; const o = (y * n + x) * 4; d[o] = rgb[0]; d[o + 1] = rgb[1]; d[o + 2] = rgb[2]; d[o + 3] = 255; };
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const gx = gx0 + x, gy = gy0 + y, wx = gx * GP, wy = gy * GP;
+    const dither = BAYER4[(gy & 3) * 4 + (gx & 3)];
+    let col;
+    const dn = vnoise(wx / 230, wy / 230, 3);
+    if (dn > 0.75) { // toprak lekeleri
+      col = DIRT[clamp(Math.floor((dn - 0.75) / 0.25 * 3 + dither * 1.2 + hash2(gx, gy, 9) * 0.6), 0, 2)];
+    } else {
+      let v = 0.65 * vnoise(wx / 170, wy / 170, 1) + 0.35 * vnoise(wx / 48, wy / 48, 2);
+      if (dn > 0.72) v -= 0.12; // toprağın etrafı biraz koyu
+      col = GRASS[clamp(Math.floor(v * 4 + dither * 0.9), 0, 3)];
     }
-    g.stroke();
+    // harita kenarına doğru kararma
+    const ed = Math.min(wx, wy, WW - wx, WH - wy);
+    const k = ed < 90 ? 0.55 + 0.45 * Math.max(0, ed) / 90 + dither * 0.06 : 1;
+    const o = (y * n + x) * 4;
+    d[o] = col[0] * k; d[o + 1] = col[1] * k; d[o + 2] = col[2] * k; d[o + 3] = 255;
   }
-  // küçük noktalar
-  g.fillStyle = 'rgba(40,80,25,0.25)';
-  for (let i = 0; i < 160; i++) g.fillRect(ox + rng() * CHUNK, oy + rng() * CHUNK, 2, 2);
-  // çiçekler
+  // çimen öbekleri ve çakıllar (dünya ızgarasına bağlı => dikişsiz)
+  const TUFT = [0x6d, 0xa5, 0x52], TUFT_D = [0x2e, 0x52, 0x29], PEB = [0x8d, 0x8f, 0x86], PEB_D = [0x5a, 0x5c, 0x55];
+  for (let y = -2; y < n + 2; y++) for (let x = -2; x < n + 2; x++) {
+    const gx = gx0 + x, gy = gy0 + y, h = hash2(gx, gy, 4);
+    if (h < 0.014) {
+      set(x, y, TUFT_D); set(x, y - 1, TUFT); set(x - 1, y - 2, TUFT); set(x + 1, y - 2, TUFT);
+      if (h < 0.006) { set(x + 2, y - 1, TUFT); set(x + 2, y, TUFT_D); }
+    } else if (h > 0.9975) { set(x, y, PEB); set(x + 1, y, PEB); set(x, y + 1, PEB_D); set(x + 1, y + 1, PEB_D); }
+  }
+  // çiçekler (5 pikselli artı şekli)
+  const YEL = [0xff, 0xd4, 0x3b];
   for (const f of world.flowers) {
-    if (f.x + 30 < ox || f.x - 30 > ox + CHUNK || f.y + 30 < oy || f.y - 30 > oy + CHUNK) continue;
+    if (f.x + 30 < ci * CHUNK || f.x - 30 > (ci + 1) * CHUNK || f.y + 30 < cj * CHUNK || f.y - 30 > (cj + 1) * CHUNK) continue;
     for (const p of f.fl) {
-      const x = f.x + p.dx, y = f.y + p.dy;
-      g.strokeStyle = '#3f7a2a'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y + 5); g.stroke();
-      g.fillStyle = p.c; g.beginPath();
-      for (let a = 0; a < 5; a++) { const an = a / 5 * TAU; g.moveTo(x + Math.cos(an) * 2.4 + 1.9, y + Math.sin(an) * 2.4); g.arc(x + Math.cos(an) * 2.4, y + Math.sin(an) * 2.4, 1.9, 0, TAU); }
-      g.fill();
-      g.fillStyle = '#ffcf3f'; g.beginPath(); g.arc(x, y, 1.4, 0, TAU); g.fill();
+      const x = Math.round((f.x + p.dx) / GP) - gx0, y = Math.round((f.y + p.dy) / GP) - gy0, rgb = hexRGB(p.c);
+      set(x, y + 2, TUFT_D); set(x, y + 1, [0x3f, 0x7a, 0x2a]);
+      set(x - 1, y, rgb); set(x + 1, y, rgb); set(x, y - 1, rgb); set(x, y + 1, rgb); set(x, y, YEL);
     }
   }
-  // harita kenarına doğru kararma
-  const ed = 90;
-  const edge = (x0, y0, x1, y1, rx, ry, rw, rh) => {
-    const gr = g.createLinearGradient(x0, y0, x1, y1);
-    gr.addColorStop(0, 'rgba(10,30,8,0.5)'); gr.addColorStop(1, 'rgba(10,30,8,0)');
-    g.fillStyle = gr; g.fillRect(rx, ry, rw, rh);
-  };
-  if (ox === 0) edge(0, 0, ed, 0, 0, oy - 1, ed, CHUNK + 2);
-  if (oy === 0) edge(0, 0, 0, ed, ox - 1, 0, CHUNK + 2, ed);
-  if (ox + CHUNK >= WW) edge(WW, 0, WW - ed, 0, WW - ed, oy - 1, ed, CHUNK + 2);
-  if (oy + CHUNK >= WH) edge(0, WH, 0, WH - ed, ox - 1, WH - ed, CHUNK + 2, ed);
+  g.putImageData(img, 0, 0);
   return c;
 }
 function getChunk(i, j) {
@@ -1011,16 +1231,50 @@ function drawIcon(g, id, x, y, size) {
   }
   g.restore();
 }
-const iconCache = {};
-function getIcon(id, px) {
-  const key = id + '_' + px;
-  if (!iconCache[key]) {
-    const c = document.createElement('canvas'); c.width = c.height = px;
-    drawIcon(c.getContext('2d'), id, 0, 0, px);
-    iconCache[key] = c;
-  }
-  return iconCache[key];
+/* ---------- Piksel özellik ikonları ----------
+   PowerUps paketinde 3 farklı ikon var (Health, alev, mavi hız). Diğerleri aynı
+   16x16 çerçeve ve renk paletiyle burada piksel piksel çiziliyor. */
+const ICON_ASSET = { maxhp: 'iconHealth', damage: 'iconFire', speed: 'iconSpeed' };
+const ICON_PAL = {
+  k: '#000000', w: '#ffffff', y: '#fff240', o: '#f2a53f', r: '#f54025', R: '#a63a3a', g: '#49f25a', G: '#34a870',
+  b: '#407cff', c: '#70a5fa', s: '#bbbdbf', S: '#898b8c', p: '#ff6b8a', P: '#c2185b', n: '#6d4c2f',
+};
+// 10x10 glifler (çerçevenin iç alanı)
+const ICON_GLYPHS = {
+  firerate:  ['.....kk...', '....kyk...', '...kyyk...', '..kyyykkk.', '.kyyyyyyk.', '.kkkkyyyk.', '....kyyk..', '...kyyk...', '...kyk....', '...kk.....'],
+  regen:     ['...GGGG..w', '...GggG.w.', '...GggG...', 'GGGGggGGGG', 'GggggggggG', 'GggggggggG', 'GGGGggGGGG', '...GggG...', '.w.GggG...', 'w..GGGG...'],
+  knockback: ['.c.....GG.', 'c.c...GggG', 'c..c.Ggggg', 'c..c.GgrgG', 'c..c.Ggggg', 'c..c.GgrgG', 'c..c.Ggggg', 'c.c...GggG', '.c.....GG.', '..........'],
+  velocity:  ['..........', '.....kkkk.', 'cc..kooyyk', '....kooyyk', 'ccc.kooyyk', '....kooyyk', 'cc..kooyyk', '.....kkkk.', '..........', '..........'],
+  double:    ['.kk....kk.', 'kyyk..kyyk', 'kyyk..kyyk', 'kook..kook', 'kook..kook', 'kook..kook', 'kRRk..kRRk', 'kook..kook', 'kkkk..kkkk', '..........'],
+  spread:    ['y...y...y.', 'y...y...y.', '.y..y..y..', '..y.y.y...', '...yyy....', '...kok....', '...kok....', '...kok....', '...kRk....', '...kkk....'],
+  pierce:    ['.......kkk', '......kwwk', '.....kwwk.', '..GG.kwk..', '.GgGkwk...', '.GGkwkG...', '..kwkGgG..', '.kwk..GG..', 'kwk.......', 'kk........'],
+  crit:      ['....rr....', '..rrrrrr..', '.rr.rr.rr.', '.r..rr..r.', 'rrrryyrrrr', 'rrrryyrrrr', '.r..rr..r.', '.rr.rr.rr.', '..rrrrrr..', '....rr....'],
+  lifesteal: ['....kk....', '...krrk...', '...krrk...', '..krrrrk..', '.krrrrrrk.', '.krwrrrrk.', 'krwrrrrrrk', 'krrrrrrRRk', '.kRRRRRRk.', '..kkkkkk..'],
+  blades:    ['....kk....', '...kssk...', '...kssk...', '.kkksskkk.', 'ksssSSsssk', 'ksssSSsssk', '.kkksskkk.', '...kssk...', '...kssk...', '....kk....'],
+  explosive: ['.......y.y', '......o.y.', '.....kok..', '...kkkk...', '..kSSkkk..', '.kSkkkkkk.', '.kkkkkkkk.', '.kkkkkkkk.', '..kkkkkk..', '...kkkk...'],
+  revive:    ['..yyyyyy..', '.y......y.', '..yyyyyy..', '..........', '.pp...pp..', 'pppp.pppp.', 'ppppppppp.', '.ppppppp..', '..ppppp...', '...ppp....'],
+};
+// PowerUps ikonlarındaki çerçevenin kopyası (16x16)
+const ICON_FRAME = ['..000000000000..', '.01233333333210.', '.02455555555420.', '.03555555555530.', '.03555555555530.', '.03555555555530.', '.03555555555530.',
+  '.03555555555530.', '.03444444444430.', '.03444444444430.', '.03444444444430.', '.03444444444430.', '.02444444444420.', '.01233333333210.', '..000000000000..', '................'];
+const FRAME_PAL = { 0: '#000000', 1: '#898b8c', 2: '#bbbdbf', 3: '#ffffff', 4: '#414558', 5: '#6d7078' };
+let iconCache = {};
+function iconCacheClear() { iconCache = {}; }
+// 16x16 piksel ikon döndürür (asset ya da kodla çizilmiş canvas)
+function getPixelIcon(id) {
+  if (iconCache[id]) return iconCache[id];
+  const ak = ICON_ASSET[id];
+  if (ak && imgOk(IMG[ak])) return (iconCache[id] = IMG[ak]);
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const g = c.getContext('2d');
+  ICON_FRAME.forEach((row, y) => { for (let x = 0; x < 16; x++) { const ch = row[x]; if (ch !== '.') { g.fillStyle = FRAME_PAL[ch]; g.fillRect(x, y + 1, 1, 1); } } });
+  const glyph = ICON_GLYPHS[id];
+  if (glyph) glyph.forEach((row, y) => { for (let x = 0; x < 10; x++) { const ch = row[x]; if (ch && ch !== '.') { g.fillStyle = ICON_PAL[ch]; g.fillRect(3 + x, 3 + y + 1, 1, 1); } } });
+  else { g.save(); g.translate(3, 4); drawIcon(g, id, 0, 0, 10); g.restore(); } // asset yüklenemediyse: eski vektör simge
+  return (iconCache[id] = c);
 }
+// Eski API (HUD'da kullanılıyor)
+function getIcon(id) { return getPixelIcon(id); }
 
 /* =====================================================================
    Oyuncu
@@ -1032,7 +1286,7 @@ function createPlayer() {
   return {
     x: WW / 2, y: WH / 2, vx: 0, vy: 0, r: C.player.radius, angle: -Math.PI / 2,
     hp: C.player.maxHp, maxHp: C.player.maxHp, invuln: 0, fireCd: 0, muzzle: 0, recoil: 0, walk: 0,
-    alive: true, deathTimer: 0, bladeAngle: 0,
+    alive: true, deathTimer: 0, bladeAngle: 0, dk: 'p', frameT: 0, sortY: 0,
     stats: { damageMult: 1, speedMult: 1, fireRateMult: 1, parallel: 1, spread: 0, pierce: 0, regen: 0, crit: 0,
              knockback: 1, lifesteal: 0, blades: 0, velocityMult: 1, explosive: 0, revives: 0 },
     levels: {}, order: [],
@@ -1067,6 +1321,7 @@ function updatePlayer(dt) {
   resolveStatic(p); clampBounds(p);
   const moving = Math.hypot(p.vx, p.vy);
   p.walk += moving * dt * 0.07;
+  p.frameT = moving > 20 ? p.frameT + dt * C.anim.playerFrameRate : 0; // yürüme kareleri
 
   // --- Nişan ve ateş ---
   let firing = false;
@@ -1096,8 +1351,8 @@ function shoot() {
   const speed = C.player.bulletSpeed * s.velocityMult;
   const life = (C.player.bulletRange * s.velocityMult) / speed;
   const ca = Math.cos(p.angle), sa = Math.sin(p.angle);
-  const tip = p.r + 17;
-  const bx = p.x + ca * tip, by = p.y + sa * tip;
+  const mz = gunMuzzle(p); // mermi silahın namlusundan çıkar
+  const bx = mz.x, by = mz.y;
   for (let i = 0; i < spreadN; i++) {
     const a = p.angle + (i - (spreadN - 1) / 2) * step;
     const c = Math.cos(a), sn = Math.sin(a);
@@ -1108,10 +1363,13 @@ function shoot() {
         x: bx - sa * off, y: by + ca * off, vx: c * speed, vy: sn * speed, speed, life,
         dmg: C.player.damage * s.damageMult * (crit ? C.player.critMultiplier : 1),
         crit, pierce: s.pierce, hits: [], size: crit ? 4 : 3,
+        // ilk karede çarpışma oyuncunun gövdesinden başlasın: yapışık zombiler de vurulabilsin
+        fromX: p.x, fromY: p.y - 20,
       });
     }
   }
   p.muzzle = 0.06; p.recoil = 1;
+  Sound.shoot();
   for (let i = 0; i < 2; i++) addParticle({ x: bx, y: by, vx: Math.cos(p.angle + rand(-0.5, 0.5)) * rand(150, 300), vy: Math.sin(p.angle + rand(-0.5, 0.5)) * rand(150, 300), life: 0.12, max: 0.12, size: 2, color: '#ffe066', drag: 6, kind: 1 });
 }
 
@@ -1124,6 +1382,7 @@ function damagePlayer(amount, fx, fy) {
   hitVignette = 1;
   const dx = p.x - fx, dy = p.y - fy, d = Math.hypot(dx, dy) || 1;
   p.vx += dx / d * 260; p.vy += dy / d * 260;
+  Sound.play('hurt', 0.1);
   spawnBlood(p.x, p.y, dx / d, dy / d, 8, 220, true);
   if (p.hp <= 0) {
     if (p.stats.revives > 0) {
@@ -1169,6 +1428,10 @@ function spawnZombie(type, x, y) {
     think: 0, direct: true, tx: x, ty: y, bladeCd: 0, stamp: 0, dead: false,
     turn: type === 'runner' ? 9 : type === 'tank' ? 4 : 6,
     skin: pick(look.skins), shirt: pick(look.shirts), pants: look.pants,
+    // sprite ve animasyon
+    dk: 'z', sortY: y, face: x < player.x ? 1 : -1, animT: rand(0, TAU), // her zombi farklı zamanda zıplar
+    sprite: type === 'tank' ? pick(ZPACK_TANK) : type === 'boss' ? ZPACK_BOSS : pick(ZPACK_NORMAL),
+    lift: t.hitLift, hitR: t.hitRadius,
   };
   if (isBoss) {
     z.state = 'chase'; z.timer = 0; z.dashCd = 3; z.dirX = 1; z.dirY = 0; z.enraged = false;
@@ -1199,6 +1462,7 @@ function updateBoss(z, dt) {
       z.dashCd -= dt;
       if (z.dashCd <= 0 && d < B.dashRange && p.alive && navLOS(z.x, z.y, p.x, p.y)) {
         z.state = 'windup'; z.timer = B.dashWindup; z.dirX = dx / d; z.dirY = dy / d;
+        Sound.play('dash', 0.2);
       }
       return null;
     case 'windup':
@@ -1251,6 +1515,10 @@ function updateZombies(dt) {
     const sp = Math.hypot(z.vx, z.vy);
     if (z.state !== 'windup' && sp > 5) z.angle = lerpAngle(z.angle, Math.atan2(z.vy, z.vx), 1 - Math.exp(-8 * dt));
     z.walk += sp * dt * 0.09;
+    // kod animasyonu: hıza göre zıplama temposu (koşucu hızlı, tank ağır)
+    const A = C.anim[z.type], mf = clamp(sp / z.speed, 0, 1);
+    z.animT += dt * A.freq * Math.PI * (C.anim.idleFactor + (1 - C.anim.idleFactor) * mf);
+    if (z.vx < -8) z.face = -1; else if (z.vx > 8) z.face = 1;
   }
 }
 
@@ -1291,7 +1559,8 @@ function hitZombie(z, dmg, dirx, diry, kbMul, isCrit, hx, hy) {
   const kb = C.player.baseKnockback * kbMul / z.mass;
   z.kbx += dirx * kb; z.kby += diry * kb;
   spawnBlood(hx, hy, dirx, diry, isCrit ? 7 : 4, 200, false);
-  if (isCrit) addText(z.x + rand(-8, 8), z.y - z.r - 6, Math.round(dmg) + '!', '#ffd43b', 18, 0.7);
+  Sound.play('hit', 0.045);
+  if (isCrit) addText(z.x + rand(-8, 8), z.y - z.lift * 2 - 6, Math.round(dmg) + '!', '#ffd43b', 18, 0.7);
   if (z.hp <= 0) killZombie(z);
 }
 
@@ -1300,10 +1569,11 @@ function killZombie(z) {
   z.dead = true;
   score += z.score; kills++;
   const big = z.type === 'boss' ? 4 : z.type === 'tank' ? 1.6 : 1;
-  spawnBlood(z.x, z.y, 0, 0, Math.round(14 * big), 260 * Math.sqrt(big), false);
+  Sound.play(z.type === 'boss' ? 'bossDeath' : 'death', z.type === 'boss' ? 0 : 0.06);
+  spawnBlood(z.x, z.y - z.lift, 0, 0, Math.round(14 * big), 260 * Math.sqrt(big), false);
   for (let i = 0; i < 5 * big; i++) {
     const a = rand(0, TAU), sp = rand(60, 220);
-    addParticle({ x: z.x, y: z.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.8), max: 0.8, size: rand(2.5, 4.5) * Math.sqrt(big), color: z.skin, drag: 4, kind: 0 });
+    addParticle({ x: z.x, y: z.y - z.lift, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.8), max: 0.8, size: rand(2.5, 4.5) * Math.sqrt(big), color: z.skin, drag: 4, kind: 0 });
   }
   addDecal(z.x, z.y, (z.r / 16));
   if (player.stats.lifesteal > 0 && player.alive) {
@@ -1321,12 +1591,13 @@ function explode(x, y, baseDmg, except) {
   const lvl = player.stats.explosive;
   const R = 50 + 16 * (lvl - 1), dmg = baseDmg * (0.35 + 0.15 * (lvl - 1));
   addParticle({ x, y, vx: 0, vy: 0, life: 0.25, max: 0.25, size: 6, grow: R * 4, color: '#ffa94d', drag: 0, kind: 2 });
+  Sound.play('explode', 0.09);
   for (let i = 0; i < 4; i++) { const a = rand(0, TAU), sp = rand(80, 220); addParticle({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.25, max: 0.25, size: 2, color: '#ffd43b', drag: 5, kind: 1 }); }
-  const list = zgQuery(x - R - 50, y - R - 50, x + R + 50, y + R + 50, _qc);
+  const list = zgQuery(x - R - 50, y - R - 50, x + R + 50, y + R + 120, _qc);
   for (const z of list) {
     if (z === except || z.dead) continue;
-    const dx = z.x - x, dy = z.y - y, d = Math.hypot(dx, dy) || 1;
-    if (d < R + z.r) hitZombie(z, dmg, dx / d, dy / d, 0.6, false, z.x, z.y);
+    const dx = z.x - x, dy = z.y - z.lift - y, d = Math.hypot(dx, dy) || 1; // gövde merkezine göre
+    if (d < R + z.hitR) hitZombie(z, dmg, dx / d, dy / d, 0.6, false, z.x, z.y - z.lift);
   }
 }
 
@@ -1335,18 +1606,21 @@ function explode(x, y, baseDmg, except) {
    ===================================================================== */
 function updateBullets(dt) {
   for (let i = bullets.length - 1; i >= 0; i--) {
-    const b = bullets[i], ox = b.x, oy = b.y;
+    const b = bullets[i];
+    const px = b.x, py = b.y; // engel kontrolü namludan
+    let ox = b.x, oy = b.y;     // zombi kontrolü (ilk karede oyuncunun gövdesinden)
+    if (b.fromX !== undefined) { ox = b.fromX; oy = b.fromY; b.fromX = undefined; }
     b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
     let dead = b.life <= 0 || b.x < 0 || b.y < 0 || b.x > WW || b.y > WH;
-    if (!dead && segmentHitsObstacle(ox, oy, b.x, b.y)) {
+    if (!dead && segmentHitsObstacle(px, py, b.x, b.y)) {
       dead = true;
       for (let k = 0; k < 3; k++) addParticle({ x: b.x, y: b.y, vx: -b.vx * rand(0.1, 0.3) + rand(-80, 80), vy: -b.vy * rand(0.1, 0.3) + rand(-80, 80), life: 0.2, max: 0.2, size: 2, color: '#ffe8a3', drag: 6, kind: 1 });
     }
     if (!dead) {
-      const list = zgQuery(Math.min(ox, b.x) - 4, Math.min(oy, b.y) - 4, Math.max(ox, b.x) + 4, Math.max(oy, b.y) + 4, _qb);
+      const list = zgQuery(Math.min(ox, b.x) - 44, Math.min(oy, b.y) - 4, Math.max(ox, b.x) + 44, Math.max(oy, b.y) + 110, _qb);
       for (const z of list) {
         if (z.dead || b.hits.includes(z.id)) continue;
-        if (segCircle(ox, oy, b.x, b.y, z.x, z.y, z.r + b.size)) {
+        if (segCircle(ox, oy, b.x, b.y, z.x, z.y - z.lift, z.hitR + b.size)) {
           const dx = b.vx / b.speed, dy = b.vy / b.speed;
           b.hits.push(z.id);
           hitZombie(z, b.dmg, dx, dy, player.stats.knockback, b.crit, b.x, b.y);
@@ -1450,6 +1724,7 @@ function startWave(n) {
   else if (n === C.waves.runnerFromWave) sub = 'Dikkat: Koşucu zombiler geliyor!';
   else if (n === 1) sub = 'Hayatta kal!';
   showBanner('DALGA ' + n, sub, 2.4, n === C.waves.total ? '#ff6b6b' : '#ffffff');
+  Sound.play('wave');
 }
 function remainingZombies() { return wave.queue.length + zombies.length; }
 
@@ -1505,6 +1780,7 @@ function updateWaves(dt) {
       const bonus = C.waves.clearBonus * wave.num;
       score += bonus;
       healPlayer(C.waves.healOnWaveClear);
+      Sound.play('clear');
       showBanner('DALGA ' + wave.num + ' TAMAMLANDI!', '+' + bonus + ' bonus puan', C.waves.betweenWaveDelay + 0.3, '#69db7c');
     }
   } else if (wave.cleared) {
@@ -1538,11 +1814,9 @@ function update(dt) {
   if (zombies.some(z => z.dead)) zombies = zombies.filter(z => !z.dead);
   updateEffects(dt);
   updateCamera(dt);
-  // ağaç tepeleri oyuncu altındayken saydamlaşır
-  for (const t of world.trees) {
-    const near = Math.abs(t.x - player.x) < t.cr + 30 && Math.abs(t.y - player.y) < t.cr + 30 && Math.hypot(t.x - player.x, t.y - player.y) < t.cr + 12;
-    t.alpha += ((near ? 0.42 : 1) - t.alpha) * Math.min(1, dt * 8);
-  }
+  // oyuncu bir ağacın arkasındayken ağaç saydamlaşır (karakter görünür kalır)
+  for (const t of world.trees) updateTreeAlpha(t, dt);
+  for (const t of world.border) if (Math.abs(t.x - player.x) < 200 && Math.abs(t.y - player.y) < 260) updateTreeAlpha(t, dt); else t.alpha = 1;
 }
 function clampCamera() {
   const halfW = W / 2 / viewScale, halfH = H / 2 / viewScale, ex = C.camera.edgeOverscroll;
@@ -1565,21 +1839,6 @@ function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill()
 function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU); ctx.fill(); }
 function line(x0, y0, x1, y1) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
 
-function drawGround() {
-  const i0 = clamp(Math.floor(view.l / CHUNK), 0, CHUNK_COLS - 1), i1 = clamp(Math.floor(view.r / CHUNK), 0, CHUNK_COLS - 1);
-  const j0 = clamp(Math.floor(view.t / CHUNK), 0, CHUNK_ROWS - 1), j1 = clamp(Math.floor(view.b / CHUNK), 0, CHUNK_ROWS - 1);
-  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) ctx.drawImage(getChunk(i, j), i * CHUNK - 1, j * CHUNK - 1);
-}
-function drawBorderForest() {
-  ctx.fillStyle = '#18301a';
-  ctx.beginPath();
-  for (const b of world.border) if (inView(b.x, b.y, b.r)) { ctx.moveTo(b.x + b.r, b.y); ctx.arc(b.x, b.y, b.r, 0, TAU); }
-  ctx.fill();
-  ctx.fillStyle = '#244a24';
-  ctx.beginPath();
-  for (const b of world.border) if (inView(b.x, b.y, b.r)) { ctx.moveTo(b.x - b.r * 0.2 + b.r * 0.6, b.y - b.r * 0.2); ctx.arc(b.x - b.r * 0.2, b.y - b.r * 0.2, b.r * 0.6, 0, TAU); }
-  ctx.fill();
-}
 function drawDecals() {
   for (const d of decals) {
     if (!inView(d.x, d.y, 40)) continue;
@@ -1600,7 +1859,7 @@ function drawBush(b) {
   ctx.fill();
   if (b.berries) { ctx.fillStyle = '#e03131'; ctx.beginPath(); for (const e of b.berries) { ctx.moveTo(b.x + e.dx + 2.2, b.y + e.dy); ctx.arc(b.x + e.dx, b.y + e.dy, 2.2, 0, TAU); } ctx.fill(); }
 }
-function drawRock(o) {
+function drawRockVector(o) {
   const poly = (ox, oy, s) => { ctx.beginPath(); o.pts.forEach((p, i) => { const x = o.x + ox + p[0] * s, y = o.y + oy + p[1] * s; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.fill(); };
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; poly(5, 6, 1);
   ctx.fillStyle = o.c1; poly(0, 0, 1);
@@ -1608,7 +1867,7 @@ function drawRock(o) {
   ctx.strokeStyle = 'rgba(40,40,40,0.35)'; ctx.lineWidth = 1.5;
   line(o.x - o.r * 0.2, o.y + o.r * 0.1, o.x + o.r * 0.3, o.y + o.r * 0.45);
 }
-function drawFence(f) {
+function drawFenceVector(f) {
   ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(f.x + 4, f.y + 6, f.w, f.h);
   ctx.fillStyle = '#8b5a2b';
   if (f.horiz) { ctx.fillRect(f.x, f.y + 1, f.w, 4); ctx.fillRect(f.x, f.y + f.h - 5, f.w, 4); }
@@ -1624,48 +1883,8 @@ function drawFence(f) {
     ctx.fillStyle = '#8f5f34'; ctx.fillRect(px - 6, py - 6, 12, 3.5);
   }
 }
-function drawSign(s) {
-  ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.rot);
-  const w = Math.max(48, s.text.length * 6.4 + 12);
-  ctx.fillStyle = 'rgba(0,0,0,0.25)'; rr(ctx, -w / 2 + 4, -12 + 6, w, 24, 3); ctx.fill();
-  ctx.fillStyle = '#5e3b1d'; ctx.fillRect(-3, 8, 6, 10);
-  ctx.fillStyle = '#c8924f'; rr(ctx, -w / 2, -12, w, 24, 3); ctx.fill();
-  ctx.strokeStyle = '#7a4f24'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.strokeStyle = 'rgba(122,79,36,0.5)'; ctx.lineWidth = 1; line(-w / 2 + 3, 0, w / 2 - 3, 0);
-  ctx.fillStyle = '#3b2410'; ctx.font = 'bold 9px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(s.text, 0, 1);
-  ctx.restore();
-}
-function drawLowLayer() {
-  for (const b of world.bushes) if (inView(b.x, b.y, b.r + 10)) drawBush(b);
-  for (const t of world.trees) {
-    if (!inView(t.x, t.y, t.cr + 30)) continue;
-    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ell(t.x + t.cr * 0.25, t.y + t.cr * 0.3, t.cr * 1.02, t.cr * 0.88);
-    ctx.fillStyle = '#5b3a1e'; circle(t.x, t.y, t.r * 0.55);
-    ctx.fillStyle = '#7a5230'; circle(t.x - 2, t.y - 2, t.r * 0.32);
-  }
-  for (const r of world.rocks) if (inView(r.x, r.y, r.r * 1.3 + 8)) drawRock(r);
-  for (const f of world.fences) if (inView(f.x + f.w / 2, f.y + f.h / 2, Math.max(f.w, f.h))) drawFence(f);
-  for (const s of world.signs) if (inView(s.x, s.y, 60)) drawSign(s);
-}
-function drawCanopies() {
-  for (const t of world.trees) {
-    if (!inView(t.x, t.y, t.cr + 10)) continue;
-    ctx.globalAlpha = t.alpha;
-    const layer = (color, sc, ox, oy) => {
-      ctx.fillStyle = color; ctx.beginPath();
-      for (const b of t.blobs) { const r = b.r * sc, x = t.x + b.dx + ox, y = t.y + b.dy + oy; ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU); }
-      ctx.fill();
-    };
-    layer(t.pal.dark, 1, 0, 0);
-    layer(t.pal.mid, 0.8, -t.cr * 0.06, -t.cr * 0.07);
-    layer(t.pal.light, 0.42, -t.cr * 0.16, -t.cr * 0.18);
-  }
-  ctx.globalAlpha = 1;
-}
-
 // --- Zombi çizimi (16 yarıçaplı tasarım, ölçeklenir) ---
-function drawZombie(z) {
+function drawZombieVector(z) {
   const s = z.r / 16, flash = z.hitFlash > 0;
   const skin = flash ? '#ffffff' : z.skin, shirt = flash ? '#f1f1f1' : z.shirt, pants = flash ? '#dddddd' : z.pants;
   ctx.save(); ctx.translate(z.x, z.y);
@@ -1708,15 +1927,6 @@ function drawZombie(z) {
   if (z.type === 'tank' && !flash) { ctx.fillStyle = '#495057'; ctx.beginPath(); ctx.arc(1, 0, 7.4, Math.PI * 0.55, Math.PI * 1.45); ctx.closePath(); ctx.fill(); }
   ctx.restore();
 }
-function drawZombieBars() {
-  for (const z of zombies) {
-    if (z.type === 'boss' || !inView(z.x, z.y, z.r + 20)) continue;
-    const w = Math.max(22, z.r * 1.8), h = 4, x = z.x - w / 2, y = z.y - z.r - 11;
-    const r = clamp(z.hp / z.maxHp, 0, 1);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
-    ctx.fillStyle = r > 0.5 ? '#69db7c' : r > 0.25 ? '#ffd43b' : '#ff6b6b'; ctx.fillRect(x, y, w * r, h);
-  }
-}
 function drawBossTelegraph() {
   const z = wave.boss;
   if (!z || z.dead || z.state !== 'windup') return;
@@ -1730,7 +1940,7 @@ function drawBossTelegraph() {
 }
 
 // --- Oyuncu çizimi ---
-function drawPlayer() {
+function drawPlayerVector() {
   const p = player;
   if (!p.alive) return;
   const flash = p.invuln > 0 && Math.floor(p.invuln * 16) % 2 === 0;
@@ -1775,22 +1985,6 @@ function drawBlades() {
     ctx.restore();
   }
 }
-function drawBullets() {
-  // tüm mermiler iki geçişte çizilir: dış parıltı + iç çekirdek
-  ctx.lineCap = 'round';
-  for (let pass = 0; pass < 2; pass++) {
-    for (const critPass of [false, true]) {
-      ctx.beginPath();
-      for (const b of bullets) {
-        if (b.crit !== critPass || !inView(b.x, b.y, 30)) continue;
-        ctx.moveTo(b.x - b.vx * 0.022, b.y - b.vy * 0.022); ctx.lineTo(b.x, b.y);
-      }
-      if (pass === 0) { ctx.strokeStyle = critPass ? 'rgba(255,140,40,0.4)' : 'rgba(255,220,120,0.35)'; ctx.lineWidth = critPass ? 9 : 7; }
-      else { ctx.strokeStyle = critPass ? '#ffb347' : '#fff5cc'; ctx.lineWidth = critPass ? 3.5 : 2.6; }
-      ctx.stroke();
-    }
-  }
-}
 function drawParticles() {
   for (const p of particles) {
     if (!inView(p.x, p.y, p.size + 20)) continue;
@@ -1815,68 +2009,6 @@ function drawTexts() {
 }
 
 // --- Ekran arayüzü (HUD) ---
-function hudText(text, x, y, size, color, align = 'left', weight = 800) {
-  ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
-  ctx.lineWidth = Math.max(3, size * 0.22); ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.lineJoin = 'round';
-  ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
-}
-function drawHUD() {
-  const p = player, narrow = W < 640;
-  const top = 12 + safe.top, left = 12 + safe.left, right = W - 12 - safe.right;
-  // Can barı (sol üst)
-  const hbW = narrow ? Math.min(170, W * 0.42) : 260, hbH = narrow ? 18 : 22;
-  ctx.fillStyle = 'rgba(0,0,0,0.45)'; rr(ctx, left, top, hbW + 38, hbH + 12, 10); ctx.fill();
-  ctx.fillStyle = '#ff4d6d'; heartPath(ctx, left + 18, top + (hbH + 12) / 2 + 1, 0.27); ctx.fill();
-  const bx = left + 32, by = top + 6, ratio = clamp(p.hp / p.maxHp, 0, 1);
-  ctx.fillStyle = '#2b1d1d'; rr(ctx, bx, by, hbW, hbH, 6); ctx.fill();
-  if (ratio > 0) {
-    const g = ctx.createLinearGradient(bx, by, bx, by + hbH);
-    const col = ratio > 0.5 ? ['#8ce99a', '#2f9e44'] : ratio > 0.25 ? ['#ffe066', '#f08c00'] : ['#ff8787', '#c92a2a'];
-    g.addColorStop(0, col[0]); g.addColorStop(1, col[1]);
-    ctx.fillStyle = g; rr(ctx, bx, by, Math.max(hbH * 0.6, hbW * ratio), hbH, 6); ctx.fill();
-  }
-  hudText(`${Math.ceil(p.hp)} / ${p.maxHp}`, bx + hbW / 2, by + hbH / 2 + 1, narrow ? 12 : 14, '#fff', 'center');
-
-  // Alınan özellikler (can barının altında küçük simgeler)
-  const isz = narrow ? 26 : 32, gap = 5;
-  const perRow = Math.max(3, Math.floor((hbW + 38) / (isz + gap)));
-  p.order.forEach((id, i) => {
-    const u = UPGRADE_BY_ID[id];
-    const x = left + (i % perRow) * (isz + gap), y = top + hbH + 20 + Math.floor(i / perRow) * (isz + gap);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; rr(ctx, x, y, isz, isz, 7); ctx.fill();
-    ctx.strokeStyle = RARITY[u.rarity].color; ctx.lineWidth = 2; rr(ctx, x + 1, y + 1, isz - 2, isz - 2, 6); ctx.stroke();
-    const px = Math.round((isz - 6) * DPR);
-    ctx.drawImage(getIcon(id, px), x + 3, y + 3, isz - 6, isz - 6);
-    const lv = id === 'revive' ? p.stats.revives : p.levels[id];
-    if (lv > 1 || id === 'revive') hudText('x' + lv, x + isz - 2, y + isz - 5, narrow ? 10 : 11, '#ffd43b', 'right');
-  });
-
-  // Dalga ve kalan zombi (üst orta; dar ekranda ikinci satır)
-  const wy = narrow ? top + hbH + 12 + (p.order.length ? Math.ceil(p.order.length / perRow) * (isz + gap) + 14 : 10) + 18 : top + 18;
-  const wx = narrow ? W / 2 : W / 2;
-  const pw = narrow ? 150 : 190;
-  ctx.fillStyle = 'rgba(0,0,0,0.45)'; rr(ctx, wx - pw / 2, wy - 16, pw, narrow ? 50 : 56, 12); ctx.fill();
-  hudText(`DALGA ${Math.max(1, wave.num)}/${C.waves.total}`, wx, wy + 1, narrow ? 18 : 22, '#fff', 'center', 900);
-  hudText(`Kalan zombi: ${remainingZombies()}`, wx, wy + (narrow ? 22 : 25), narrow ? 12 : 14, '#ffc9c9', 'center', 700);
-
-  // Skor (sağ üst, duraklat butonunun solunda)
-  const sx = right - 52;
-  hudText('SKOR', sx, top + 10, narrow ? 11 : 12, '#ced4da', 'right', 800);
-  hudText(score.toLocaleString('tr-TR'), sx, top + 30, narrow ? 20 : 26, '#ffd43b', 'right', 900);
-  if (!narrow) hudText('Rekor: ' + Math.max(bestScore, score).toLocaleString('tr-TR'), sx, top + 52, 12, '#adb5bd', 'right', 700);
-
-  // Boss can barı
-  const boss = wave.boss;
-  if (boss && !boss.dead) {
-    const bw = Math.min(520, W - 40), bxx = W / 2 - bw / 2, byy = narrow ? wy + 48 : top + 80;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; rr(ctx, bxx - 6, byy - 6, bw + 12, 34, 10); ctx.fill();
-    const r = clamp(boss.hp / boss.maxHp, 0, 1);
-    ctx.fillStyle = '#3a0f0f'; rr(ctx, bxx, byy + 8, bw, 14, 5); ctx.fill();
-    const g = ctx.createLinearGradient(bxx, 0, bxx + bw, 0); g.addColorStop(0, '#c92a2a'); g.addColorStop(1, '#ff6b6b');
-    ctx.fillStyle = g; rr(ctx, bxx, byy + 8, Math.max(8, bw * r), 14, 5); ctx.fill();
-    hudText('DEV ZOMBİ' + (boss.enraged ? ' (ÖFKELİ)' : ''), W / 2, byy + 1, 12, '#ffc9c9', 'center', 900);
-  }
-}
 // Ekran dışındaki son zombileri gösteren oklar
 function drawEdgeArrows() {
   const rem = remainingZombies();
@@ -1894,23 +2026,6 @@ function drawEdgeArrows() {
     const s = z.type === 'boss' ? 1.5 : 1;
     ctx.beginPath(); ctx.moveTo(14 * s, 0); ctx.lineTo(-8 * s, -10 * s); ctx.lineTo(-4 * s, 0); ctx.lineTo(-8 * s, 10 * s); ctx.closePath(); ctx.fill();
     ctx.restore();
-  }
-}
-function drawSticks() {
-  if (!input.touchMode || state !== 'playing') return;
-  const defs = [
-    [sticks.move, 26 + STICK_R + safe.left, H - 26 - STICK_R - safe.bottom, 'HAREKET'],
-    [sticks.aim, W - 26 - STICK_R - safe.right, H - 26 - STICK_R - safe.bottom, 'ATEŞ'],
-  ];
-  for (const [st, dx, dy, label] of defs) {
-    const bx = st.active ? st.bx : dx, by = st.active ? st.by : dy;
-    const kx = st.active ? st.kx : bx, ky = st.active ? st.ky : by;
-    ctx.fillStyle = st.active ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)';
-    ctx.beginPath(); ctx.arc(bx, by, STICK_R, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = label === 'ATEŞ' ? (st.active ? 'rgba(255,110,90,0.85)' : 'rgba(255,110,90,0.45)') : (st.active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.4)');
-    ctx.beginPath(); ctx.arc(kx, ky, 26, 0, TAU); ctx.fill();
-    if (!st.active) hudText(label, bx, by + STICK_R + 14, 11, 'rgba(255,255,255,0.6)', 'center', 800);
   }
 }
 function drawBanner() {
@@ -1934,28 +2049,373 @@ function drawVignette() {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
 
+/* =====================================================================
+   Sprite çizimi (asset yoksa eski kod-çizimine düşer)
+   ===================================================================== */
+// --- Zombi animasyonu: sinüs zıplama + squash & stretch + sallanma. Gölge yerinde kalır. ---
+function zombieAnim(z) {
+  const A = C.anim[z.type], h = Math.abs(Math.sin(z.animT)); // h: 0 = yerde, 1 = tepede
+  return {
+    h, bob: h * A.bob,
+    sx: lerp(1 + A.squash * 0.8, 1 - A.squash * 0.4, h), // yere inince basık, havada ince-uzun
+    sy: lerp(1 - A.squash, 1 + A.squash * 0.6, h),
+    rot: Math.sin(z.animT) * A.sway,                    // her zıplamada sağa/sola
+  };
+}
+function zombieSprite(z) {
+  if (z.type === 'runner') {
+    const key = (Math.floor(z.animT / Math.PI) & 1) ? 'runner2' : 'runner1'; // Zombie1/2: 2 kareli yürüyüş
+    return { key, sx: 0, sy: 0, sw: 16, sh: 16, ax: 8, ay: 16, top: 11, s: C.sprites.runner };
+  }
+  const i = z.sprite;
+  return { key: 'zpack', sx: (i % 8) * 32, sy: (i >> 3) * 32, sw: 32, sh: 32, ax: 16, ay: 30, top: 26, s: C.sprites[z.type] };
+}
+function drawZombieSprite(z) {
+  const sp = zombieSprite(z), im = IMG[sp.key];
+  if (!imgOk(im)) { drawZombieVector(z); return; }
+  const a = zombieAnim(z);
+  let ox = 0;
+  if (z.type === 'boss' && z.state === 'windup') ox = rand(-2, 2);
+  ctx.save();
+  ctx.translate(z.x + ox, z.y - a.bob);
+  ctx.rotate(a.rot);
+  ctx.scale(z.face * a.sx * sp.s, a.sy * sp.s);
+  ctx.drawImage(im, sp.sx, sp.sy, sp.sw, sp.sh, -sp.ax, -sp.ay, sp.sw, sp.sh);
+  let tintA = 0, tintC = '#ffffff';
+  if (z.hitFlash > 0) tintA = 0.85;
+  else if (z.type === 'boss' && z.state === 'windup') { tintA = 0.35 + 0.3 * Math.sin(performance.now() / 50); tintC = '#ff2020'; }
+  else if (z.type === 'boss' && z.enraged) { tintA = 0.22; tintC = '#ff2020'; }
+  const tint = TINT[sp.key + tintC];
+  if (tintA > 0 && tint) { ctx.globalAlpha = tintA; ctx.drawImage(tint, sp.sx, sp.sy, sp.sw, sp.sh, -sp.ax, -sp.ay, sp.sw, sp.sh); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+
+// --- Oyuncu: gövde yöne göre sağa/sola döner, silah ayrı kesilip nişana döndürülür ---
+// Player sprite'ında (32x32, sola bakan) ayak noktası (23.5, 28), silahın tutulduğu el (17, 24.5)
+const PL = { footX: 23.5, footY: 28, handX: 17, handY: 24.5, gun: [4, 20, 15, 8], gunLen: 13 };
+function playerFacingRight(p) { return Math.cos(p.angle) > 0; }
+function gunPivot(p) {
+  const s = C.sprites.player, fr = playerFacingRight(p);
+  const back = p.recoil * 3;
+  return { x: p.x + (fr ? 1 : -1) * (PL.footX - PL.handX) * s - Math.cos(p.angle) * back, y: p.y - (PL.footY - PL.handY) * s - Math.sin(p.angle) * back };
+}
+function gunMuzzle(p) {
+  const pv = gunPivot(p), L = PL.gunLen * C.sprites.player;
+  return { x: pv.x + Math.cos(p.angle) * L, y: pv.y + Math.sin(p.angle) * L };
+}
+function drawPlayerSprite() {
+  const p = player;
+  if (!p.alive) return;
+  const frameIdx = [0, 1, 2, 1][Math.floor(p.frameT) % 4];
+  const key = 'player' + (frameIdx + 1), im = IMG[key];
+  if (!imgOk(im)) { drawPlayerVector(); return; }
+  const s = C.sprites.player, fr = playerFacingRight(p);
+  const flash = p.invuln > 0 && Math.floor(p.invuln * 16) % 2 === 0;
+  const tint = TINT[key + '#ff3030'];
+  const body = g => {
+    ctx.drawImage(g, 17, 11, 14, 10, 17, 11, 14, 10); // baş + gövde üstü
+    ctx.drawImage(g, 19, 21, 12, 8, 19, 21, 12, 8);   // gövde altı + bacaklar (silah hariç)
+  };
+  ctx.save();
+  ctx.translate(p.x, p.y); ctx.scale(fr ? -s : s, s); ctx.translate(-PL.footX, -PL.footY);
+  body(im);
+  if (flash && tint) { ctx.globalAlpha = 0.75; body(tint); ctx.globalAlpha = 1; }
+  ctx.restore();
+  // silah
+  const pv = gunPivot(p), [gx, gy, gw, gh] = PL.gun;
+  ctx.save();
+  ctx.translate(pv.x, pv.y); ctx.rotate(p.angle);
+  if (Math.cos(p.angle) < 0) ctx.scale(1, -1); // sola nişan alınca silah ters dönmesin
+  ctx.scale(-s, s);                              // sprite'taki silah sola bakıyor, +x'e çevir
+  ctx.drawImage(im, gx, gy, gw, gh, gx - PL.handX, gy - PL.handY, gw, gh);
+  if (flash && tint) { ctx.globalAlpha = 0.75; ctx.drawImage(tint, gx, gy, gw, gh, gx - PL.handX, gy - PL.handY, gw, gh); ctx.globalAlpha = 1; }
+  ctx.restore();
+  // namlu parlaması (Player/Shot.png)
+  if (p.muzzle > 0) {
+    const m = gunMuzzle(p), ms = C.sprites.muzzle;
+    if (imgOk(IMG.muzzle)) {
+      ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(p.angle);
+      ctx.drawImage(IMG.muzzle, -5 * ms, -10.5 * ms, 25 * ms, 21 * ms);
+      ctx.restore();
+    } else { ctx.fillStyle = '#ffe066'; circle(m.x, m.y, 8); }
+  }
+}
+
+// --- Harita nesneleri ---
+function drawTree(t) {
+  const d = t.def;
+  if (!imgOk(IMG.env)) { // yedek: basit kod-çizimi ağaç
+    ctx.fillStyle = '#5b3a1e'; ctx.fillRect(t.x - 5, t.y - 30, 10, 30);
+    ctx.globalAlpha = t.alpha; ctx.fillStyle = t.pal.dark; circle(t.x, t.y - t.h * 0.55, t.w * 0.42);
+    ctx.fillStyle = t.pal.light; circle(t.x - 8, t.y - t.h * 0.6, t.w * 0.22); ctx.globalAlpha = 1;
+    return;
+  }
+  ctx.globalAlpha = t.alpha;
+  ctx.drawImage(IMG.env, d.sx, d.sy, d.sw, d.sh, t.x - d.ax * t.s, t.y - (d.sh - 2) * t.s, d.sw * t.s, d.sh * t.s);
+  ctx.globalAlpha = 1;
+}
+function drawRockSprite(o) {
+  if (!imgOk(IMG.env)) { drawRockVector(o); return; }
+  const d = ENV.rock, w = d.sw * o.s, h = d.sh * o.s;
+  ctx.save(); ctx.translate(o.x, o.y + o.r * 0.45); if (o.flip) ctx.scale(-1, 1);
+  ctx.drawImage(IMG.env, d.sx, d.sy, d.sw, d.sh, -w / 2, -h, w, h);
+  ctx.restore();
+}
+function drawFenceSprite(f) {
+  if (!imgOk(IMG.fence)) { drawFenceVector(f); return; }
+  const sw = 127 * C.sprites.fence, sh = 91 * C.sprites.fence;
+  for (let i = 0; i < f.segs; i++) ctx.drawImage(IMG.fence, f.x + i * sw, f.y + f.h - sh + 2, sw + 0.5, sh);
+}
+function drawBushSprite(b) {
+  if (!imgOk(IMG.env)) { drawBush(b); return; }
+  const d = b.def, w = d.sw * b.s, h = d.sh * b.s;
+  ctx.save(); ctx.translate(b.x, b.y); if (b.flip) ctx.scale(-1, 1);
+  ctx.drawImage(IMG.env, d.sx, d.sy, d.sw, d.sh, -w / 2, -h, w, h);
+  ctx.restore();
+}
+function drawGrave(g) {
+  const s = C.sprites.grave;
+  if (imgOk(IMG.grave)) {
+    ctx.save(); ctx.translate(g.x, g.y); if (g.flip) ctx.scale(-1, 1);
+    ctx.drawImage(IMG.grave, -9 * s, -16 * s, 18 * s, 16 * s); ctx.restore();
+  } else { ctx.fillStyle = '#8a8f96'; ctx.fillRect(g.x - 14, g.y - 30, 28, 30); }
+}
+// Tahta tabela: pakette yok, piksel stiliyle kodla çiziliyor
+function drawSign(s) {
+  ctx.save(); ctx.translate(Math.round(s.x), Math.round(s.y)); ctx.rotate(s.rot);
+  ctx.font = 'bold 9px ' + FONT;
+  const w = Math.ceil((ctx.measureText(s.text).width + 14) / 2) * 2, h = 20, top = -40;
+  ctx.fillStyle = '#000'; ctx.fillRect(-4, top + h - 2, 8, 22);              // direk dış çizgi
+  ctx.fillStyle = '#6b4423'; ctx.fillRect(-2, top + h, 4, 20 - 2);           // direk
+  ctx.fillStyle = '#000'; ctx.fillRect(-w / 2 - 2, top - 2, w + 4, h + 4);   // tahta dış çizgi
+  ctx.fillStyle = '#a8703c'; ctx.fillRect(-w / 2, top, w, h);
+  ctx.fillStyle = '#c8924f'; ctx.fillRect(-w / 2, top, w, 4);                // üst ışık
+  ctx.fillStyle = '#7a4f24'; ctx.fillRect(-w / 2, top + h - 4, w, 4);        // alt gölge
+  ctx.fillRect(-w / 2, top + h / 2 - 1, w, 2);                               // tahta arası
+  ctx.fillStyle = '#3b2410'; ctx.fillRect(-w / 2 + 2, top + 2, 2, 2); ctx.fillRect(w / 2 - 4, top + 2, 2, 2); // çiviler
+  ctx.fillStyle = '#2b1a0c'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(s.text, 0, top + h / 2 + 1);
+  ctx.restore();
+}
+
+// Gölgeler sprite'lardan önce, zemine çizilir (zıplayan zombinin gölgesi yerinde kalır)
+function drawShadow(o) {
+  switch (o.dk) {
+    case 'tree': ctx.fillStyle = 'rgba(0,0,0,0.28)'; ell(o.x + 4, o.y, o.w * 0.3, o.w * 0.1); break;
+    case 'rock': ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(o.x + 4, o.y + o.r * 0.4, o.r * 1.25, o.r * 0.42); break;
+    case 'fence': ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(o.x + 3, o.y + o.h - 3, o.w, 6); break;
+    case 'bush': ctx.fillStyle = 'rgba(0,0,0,0.2)'; ell(o.x + 2, o.y, o.r * 1.1, o.r * 0.35); break;
+    case 'grave': ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(o.x + 2, o.y, 20, 6); break;
+    case 'sign': ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(o.x + 2, o.y, 10, 4); break;
+    case 'z': {
+      const k = 1 - 0.25 * zombieAnim(o).h;
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ell(o.x, o.y, o.r * 1.1 * k, o.r * 0.42 * k); break;
+    }
+    case 'p': ctx.fillStyle = 'rgba(0,0,0,0.3)'; ell(o.x, o.y, 14, 5); break;
+  }
+}
+function drawObject(o) {
+  switch (o.dk) {
+    case 'tree': drawTree(o); break;
+    case 'rock': drawRockSprite(o); break;
+    case 'fence': drawFenceSprite(o); break;
+    case 'bush': drawBushSprite(o); break;
+    case 'grave': drawGrave(o); break;
+    case 'sign': drawSign(o); break;
+    case 'z': drawZombieSprite(o); break;
+    case 'p': drawPlayerSprite(); break;
+  }
+}
+function staticVisible(o) {
+  if (o.dk === 'tree') return inView(o.x, o.y - o.h / 2, Math.max(o.w, o.h) / 2 + 10);
+  if (o.dk === 'fence') return inView(o.x + o.w / 2, o.y, o.w / 2 + 60);
+  return inView(o.x, o.y - 20, 80);
+}
+// Oyuncu bir ağacın arkasındaysa ağaç yarı saydam olur
+function updateTreeAlpha(t, dt) {
+  const p = player;
+  const behind = p && p.alive && p.y < t.y + 2 && p.y > t.y - t.h + 12 && Math.abs(p.x - t.x) < t.w * 0.42;
+  t.alpha += ((behind ? 0.42 : 1) - t.alpha) * Math.min(1, dt * 10);
+}
+
+function drawGround() {
+  const GP = C.sprites.groundPixel, size = (Math.ceil(CHUNK / GP) + 1) * GP;
+  const i0 = clamp(Math.floor(view.l / CHUNK), 0, CHUNK_COLS - 1), i1 = clamp(Math.floor(view.r / CHUNK), 0, CHUNK_COLS - 1);
+  const j0 = clamp(Math.floor(view.t / CHUNK), 0, CHUNK_ROWS - 1), j1 = clamp(Math.floor(view.b / CHUNK), 0, CHUNK_ROWS - 1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) ctx.drawImage(getChunk(i, j), i * CHUNK, j * CHUNK, size, size);
+}
+function drawBullets() {
+  ctx.lineCap = 'round';
+  for (const critPass of [false, true]) { // kısa iz çizgisi
+    ctx.beginPath();
+    for (const b of bullets) {
+      if (b.crit !== critPass || !inView(b.x, b.y, 30)) continue;
+      ctx.moveTo(b.x - b.vx * 0.025, b.y - b.vy * 0.025); ctx.lineTo(b.x, b.y);
+    }
+    ctx.strokeStyle = critPass ? 'rgba(255,140,40,0.55)' : 'rgba(255,240,64,0.4)'; ctx.lineWidth = critPass ? 5 : 3.5;
+    ctx.stroke();
+  }
+  const ok = imgOk(IMG.bullet), bs = C.sprites.bullet;
+  for (const b of bullets) {
+    if (!inView(b.x, b.y, 20)) continue;
+    if (ok) {
+      const s = 12 * bs * (b.crit ? 1.4 : 1);
+      ctx.drawImage(IMG.bullet, 2, 2, 12, 12, b.x - s / 2, b.y - s / 2, s, s);
+      if (b.crit && imgOk(IMG.bulletRing)) ctx.drawImage(IMG.bulletRing, 2, 2, 12, 12, b.x - s * 0.75, b.y - s * 0.75, s * 1.5, s * 1.5);
+    } else { ctx.fillStyle = b.crit ? '#ffb347' : '#fff5cc'; circle(b.x, b.y, b.size); }
+  }
+}
+function drawZombieBars() {
+  const fr = IMG.zbarFrame, ok = imgOk(fr), sc = 0.75;
+  for (const z of zombies) {
+    if (z.type === 'boss' || !inView(z.x, z.y - 40, z.r + 60)) continue;
+    const sp = zombieSprite(z), r = clamp(z.hp / z.maxHp, 0, 1);
+    const w = 42 * sc, h = 11 * sc, x = Math.round(z.x - w / 2), y = Math.round(z.y - sp.top * sp.s - h - 10);
+    if (ok) {
+      ctx.drawImage(fr, x, y, w, h);
+      const fill = r > 0.5 ? IMG.zbarGreen : r > 0.25 ? IMG.zbarYellow : IMG.zbarRed;
+      if (r > 0 && imgOk(fill)) ctx.drawImage(fill, 0, 0, Math.max(1, 34 * r), 5, x + 4 * sc, y + 3 * sc, 34 * r * sc, 5 * sc);
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x - 1, y - 1, w + 2, 6);
+      ctx.fillStyle = r > 0.5 ? '#69db7c' : r > 0.25 ? '#ffd43b' : '#ff6b6b'; ctx.fillRect(x, y, w * r, 4);
+    }
+  }
+}
+
+/* ---------- HUD yardımcıları: Pixel UI pack 3 parçaları (9-slice / 3-slice) ---------- */
+function draw3(img, x, y, w, h, cap) { // yatay 3 dilim: kenarlar sabit, orta uzar
+  const iw = img.naturalWidth, ih = img.naturalHeight, sc = h / ih, cw = cap * sc;
+  ctx.drawImage(img, 0, 0, cap, ih, x, y, cw, h);
+  ctx.drawImage(img, cap, 0, iw - 2 * cap, ih, x + cw, y, Math.max(0, w - 2 * cw), h);
+  ctx.drawImage(img, iw - cap, 0, cap, ih, x + w - cw, y, cw, h);
+}
+function drawNine(img, x, y, w, h, sl, sc) {
+  if (!imgOk(img)) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x, y, w, h); return; }
+  const iw = img.naturalWidth, ih = img.naturalHeight, d = sl * sc, mw = iw - 2 * sl, mh = ih - 2 * sl;
+  const xs = [[0, x, sl, d], [sl, x + d, mw, w - 2 * d], [iw - sl, x + w - d, sl, d]];
+  const ys = [[0, y, sl, d], [sl, y + d, mh, h - 2 * d], [ih - sl, y + h - d, sl, d]];
+  for (const [sx, dx, sw, dw] of xs) for (const [sy, dy, sh, dh] of ys) if (dw > 0 && dh > 0) ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+// Pixel UI barı (çerçeve + oranlı dolgu). frame: 48x11, dolgu: 42x5 (iç ofset 3,3)
+function drawPixelBar(x, y, w, h, ratio, fillImg) {
+  const fr = IMG.barFrame;
+  if (!imgOk(fr) || !imgOk(fillImg)) {
+    ctx.fillStyle = '#000'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#2b1d1d'; ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+    ctx.fillStyle = '#e03131'; ctx.fillRect(x + 3, y + 3, (w - 6) * ratio, h - 6); return;
+  }
+  const sc = h / 11;
+  ctx.fillStyle = '#16131a'; ctx.fillRect(x + 4 * sc, y + 3 * sc, w - 8 * sc, 5 * sc);
+  if (ratio > 0) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, 3 * sc + (w - 6 * sc) * ratio, h); ctx.clip();
+    draw3(fillImg, x + 3 * sc, y + 3 * sc, w - 6 * sc, 5 * sc, 5);
+    ctx.restore();
+  }
+  draw3(fr, x, y, w, h, 7);
+}
+
+function hudText(text, x, y, size, color, align = 'left', weight = 900) {
+  ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(3, size * 0.25); ctx.strokeStyle = '#000'; ctx.lineJoin = 'miter'; ctx.miterLimit = 2;
+  ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+function drawHUD() {
+  const p = player, narrow = W < 640, u = narrow ? 2 : 3;
+  const top = 12 + safe.top, left = 12 + safe.left, right = W - 12 - safe.right;
+  // Can barı (sol üst): kalp + Pixel UI barı
+  const hbW = narrow ? Math.min(170, W * 0.42) : 250, hbH = 11 * u;
+  const ratio = clamp(p.hp / p.maxHp, 0, 1);
+  if (imgOk(IMG.heart)) ctx.drawImage(IMG.heart, left, top + (hbH - 12 * u * 0.9) / 2, 12 * u * 0.9, 12 * u * 0.9);
+  else { ctx.fillStyle = '#ff4d6d'; heartPath(ctx, left + 15, top + hbH / 2 + 1, 0.3); ctx.fill(); }
+  const bx = left + 12 * u, by = top;
+  drawPixelBar(bx, by, hbW, hbH, ratio, ratio > 0.5 ? IMG.barGreen : ratio > 0.25 ? IMG.barYellow : IMG.barRed);
+  hudText(`${Math.ceil(p.hp)} / ${p.maxHp}`, bx + hbW / 2, by + hbH / 2 + 1, narrow ? 12 : 15, '#fff', 'center');
+
+  // Alınan özellikler (can barının altında piksel simgeler)
+  const isz = 16 * (narrow ? 2 : 2), gap = 4;
+  const perRow = Math.max(3, Math.floor((hbW + 12 * u) / (isz + gap)));
+  p.order.forEach((id, i) => {
+    const x = left + (i % perRow) * (isz + gap), y = top + hbH + 8 + Math.floor(i / perRow) * (isz + gap);
+    ctx.drawImage(getPixelIcon(id), x, y, isz, isz);
+    const lv = id === 'revive' ? p.stats.revives : p.levels[id];
+    if (lv > 1 || id === 'revive') hudText('x' + lv, x + isz + 1, y + isz - 4, narrow ? 10 : 11, '#ffd43b', 'right');
+  });
+
+  // Dalga ve kalan zombi (Pixel UI paneli; dar ekranda ikinci satır)
+  const iconRows = p.order.length ? Math.ceil(p.order.length / perRow) : 0;
+  const pw = narrow ? 160 : 210, ph = narrow ? 52 : 62;
+  const wy = narrow ? top + hbH + 12 + iconRows * (isz + gap) + 6 : top - 4;
+  drawNine(IMG.panel, W / 2 - pw / 2, wy, pw, ph, 7, u);
+  hudText(`DALGA ${Math.max(1, wave.num)}/${C.waves.total}`, W / 2, wy + ph * 0.38, narrow ? 17 : 21, '#fff', 'center');
+  hudText(`Kalan zombi: ${remainingZombies()}`, W / 2, wy + ph * 0.7, narrow ? 12 : 14, '#ffc9c9', 'center', 800);
+
+  // Skor (sağ üst, ses ve duraklat butonlarının solunda)
+  const sx = right - 112;
+  hudText('SKOR', sx, top + 8, narrow ? 11 : 12, '#ced4da', 'right', 800);
+  hudText(score.toLocaleString('tr-TR'), sx, top + 28, narrow ? 20 : 26, '#ffd43b', 'right');
+  if (!narrow) hudText('Rekor: ' + Math.max(bestScore, score).toLocaleString('tr-TR'), sx, top + 50, 12, '#adb5bd', 'right', 800);
+
+  // Boss can barı
+  const boss = wave.boss;
+  if (boss && !boss.dead) {
+    const bw = Math.min(520, W - 40), bh = 11 * u, bxx = W / 2 - bw / 2, byy = wy + ph + 18;
+    hudText('DEV ZOMBİ' + (boss.enraged ? ' (ÖFKELİ)' : ''), W / 2, byy - 6, 13, '#ffc9c9', 'center');
+    drawPixelBar(bxx, byy + 2, bw, bh, clamp(boss.hp / boss.maxHp, 0, 1), IMG.barRed);
+  }
+}
+function drawSticks() {
+  if (!input.touchMode || state !== 'playing') return;
+  const defs = [
+    [sticks.move, 26 + STICK_R + safe.left, H - 26 - STICK_R - safe.bottom, 'HAREKET', IMG.knobGreen],
+    [sticks.aim, W - 26 - STICK_R - safe.right, H - 26 - STICK_R - safe.bottom, 'ATEŞ', IMG.knobRed],
+  ];
+  for (const [st, dx, dy, label, knob] of defs) {
+    const bx = st.active ? st.bx : dx, by = st.active ? st.by : dy;
+    const kx = st.active ? st.kx : bx, ky = st.active ? st.ky : by;
+    // taban: kalın piksel çerçeveli halka
+    ctx.fillStyle = st.active ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.2)';
+    ctx.beginPath(); ctx.arc(bx, by, STICK_R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 6; ctx.stroke();
+    ctx.strokeStyle = st.active ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.45)'; ctx.lineWidth = 3; ctx.stroke();
+    if (imgOk(knob)) {
+      const ks = 3.2, w = 18 * ks, h = 16 * ks;
+      ctx.globalAlpha = st.active ? 1 : 0.7;
+      ctx.drawImage(knob, kx - w / 2, ky - h / 2, w, h);
+      if (label === 'ATEŞ' && imgOk(IMG.shootIcon)) ctx.drawImage(IMG.shootIcon, kx - 14, ky - 22, 28, 28);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillStyle = label === 'ATEŞ' ? 'rgba(255,110,90,0.8)' : 'rgba(255,255,255,0.6)';
+      ctx.beginPath(); ctx.arc(kx, ky, 26, 0, TAU); ctx.fill();
+    }
+    if (!st.active) hudText(label, bx, by + STICK_R + 14, 11, 'rgba(255,255,255,0.75)', 'center', 800);
+  }
+}
+
+const drawList = [];
 function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#16291a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = false; // piksel sanatı keskin kalsın
+  ctx.fillStyle = '#1b2a1d'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   const shx = shake > 0 ? rand(-shake, shake) : 0, shy = shake > 0 ? rand(-shake, shake) : 0;
   const cx = camX + shx / viewScale, cy = camY + shy / viewScale;
   const sc = viewScale * DPR;
   ctx.setTransform(sc, 0, 0, sc, (W / 2 - cx * viewScale) * DPR, (H / 2 - cy * viewScale) * DPR);
   view.l = cx - W / 2 / viewScale; view.r = cx + W / 2 / viewScale; view.t = cy - H / 2 / viewScale; view.b = cy + H / 2 / viewScale;
 
-  drawBorderForest();
   drawGround();
   drawDecals();
-  drawLowLayer();
+  // Görünür nesneleri topla, gölgeleri çiz, sonra Y'ye göre sıralayıp çiz
+  drawList.length = 0;
+  for (const o of world.statics) if (staticVisible(o)) drawList.push(o);
   if (player) {
-    drawBossTelegraph();
-    for (const z of zombies) if (inView(z.x, z.y, z.r + 30)) drawZombie(z);
-    drawBlades();
-    drawPlayer();
-    drawBullets();
+    for (const z of zombies) if (inView(z.x, z.y - 40, z.r + 100)) { z.sortY = z.y; drawList.push(z); }
+    if (player.alive) { player.sortY = player.y; drawList.push(player); }
   }
+  for (const o of drawList) drawShadow(o);
+  if (player) drawBossTelegraph();
+  drawList.sort((a, b) => a.sortY - b.sortY);
+  for (const o of drawList) drawObject(o);
+  if (player) { drawBlades(); drawBullets(); }
   drawParticles();
-  drawCanopies();
   if (player) drawZombieBars();
   drawTexts();
 
@@ -1977,9 +2437,10 @@ function showOverlay(id) {
   for (const o of document.querySelectorAll('.overlay')) o.classList.toggle('show', o.id === id);
   $('btnPause').style.display = (id === null && state === 'playing') ? 'block' : 'none';
 }
-function setState(s, overlay) { state = s; showOverlay(overlay); }
+function setState(s, overlay) { state = s; showOverlay(overlay); Sound.updateMusic(); }
 
 function newGame() {
+  Sound.unlock();
   generateWorld();
   player = createPlayer();
   zombies = []; bullets = []; particles = []; decals = []; texts = [];
@@ -2002,12 +2463,8 @@ function openUpgrade(first) {
     const lv = player.levels[u.id] || 0;
     const card = document.createElement('div');
     card.className = 'card ' + u.rarity;
-    const cv = document.createElement('canvas'); cv.className = 'ic'; cv.width = cv.height = 176;
-    const g = cv.getContext('2d');
-    const gr = g.createRadialGradient(88, 88, 10, 88, 88, 88);
-    gr.addColorStop(0, RARITY[u.rarity].bg); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 176, 176);
-    drawIcon(g, u.id, 22, 22, 132);
+    const cv = document.createElement('canvas'); cv.className = 'ic'; cv.width = cv.height = 16; // pikselli büyütülür (CSS)
+    cv.getContext('2d').drawImage(getPixelIcon(u.id), 0, 0, 16, 16);
     const txt = document.createElement('div'); txt.className = 'txt';
     txt.innerHTML = `<div class="rar">${RARITY[u.rarity].label}</div><div class="nm"></div><div class="ds"></div><div class="lv"></div>`;
     txt.querySelector('.nm').textContent = u.name;
@@ -2028,6 +2485,7 @@ function chooseUpgrade(u) {
     if (!p.levels[u.id]) p.order.push(u.id);
     p.levels[u.id] = (p.levels[u.id] || 0) + 1;
     u.apply(p.stats, p);
+    Sound.play('pick');
   }
   currentCards = [];
   setState('playing', null);
@@ -2085,6 +2543,7 @@ function frame(now) {
     camX = WW / 2 + Math.cos(menuTime * 0.06) * 700; camY = WH / 2 + Math.sin(menuTime * 0.045) * 600;
     clampCamera();
     for (const t of world.trees) t.alpha = 1;
+    for (const t of world.border) t.alpha = 1;
   }
   // zemin parçalarını boşta yavaş yavaş hazırla
   if (world.chunkQueue.length) {
@@ -2095,7 +2554,16 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// Butonlarda tık sesi, ilk dokunuşta ses kilidini aç
+document.addEventListener('click', e => { if (e.target.closest('.btn, .imgbtn, .iconbtn')) Sound.play('click', 0.05); }, true);
+for (const ev of ['pointerdown', 'touchstart', 'keydown']) window.addEventListener(ev, () => Sound.unlock(), { capture: true, passive: true });
+$('btnMute').addEventListener('click', () => Sound.toggleMute());
+$('btnMute').addEventListener('touchstart', e => { e.preventDefault(); Sound.toggleMute(); }, { passive: false });
+
 // Başlat
+Sound.init();
+drawMuteIcon();
+loadAssets(onAssetsReady);
 generateWorld();
 toMenu();
 requestAnimationFrame(frame);
@@ -2105,7 +2573,7 @@ window.ZD = {
   get state() { return state; }, get player() { return player; }, get zombies() { return zombies; },
   get wave() { return wave; }, get bullets() { return bullets; }, get score() { return score; },
   startWave, chooseUpgrade, openUpgrade, newGame, update, render, CONFIG,
-  get cards() { return currentCards; }, input, sticks,
+  get cards() { return currentCards; }, input, sticks, world,
 };
 </script>
 </body>
