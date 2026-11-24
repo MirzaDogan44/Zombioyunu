@@ -19,6 +19,7 @@ Telefonda oynamak için klasörü olduğu gibi bir statik sunucuya (ör. GitHub 
 | Ateş | Sol tık (basılı tutunca sürekli ateş) | Sağ joystick'i çekince otomatik ateş |
 | Duraklat | `ESC` veya `P` | Sağ üstteki duraklat butonu |
 | Ses aç/kapa | `M` | Sağ üstteki hoparlör butonu |
+| Hitbox debug | `H`: hitbox dairelerini gösterir/gizler | – |
 | Özellik seçimi | Kartlara tıklama veya `1` `2` `3` tuşları | Karta dokunma |
 
 Sesler tarayıcı kuralları gereği ilk tıklama ya da dokunuştan sonra başlar. Ses tercihi tarayıcıda saklanır.
@@ -34,6 +35,8 @@ Sesler tarayıcı kuralları gereği ilk tıklama ya da dokunuştan sonra başla
   - **Dev Zombi (Boss):** 10. dalgada gelir (korsan kaptan). Ekranın üstünde kendi can barı var. Ara ara kırmızı bir uyarı alanı gösterip o yöne hızla atılır; kırmızı alandan çekilin. Canı yarıya inince öfkelenir.
 - Ağaçlar, kayalar ve demir çitler hem sizi hem zombileri hem de mermileri durdurur. Çalılar, mezar taşları, tabelalar ve çiçekler sadece süs.
 - Nesneler derinliğe göre sıralanır. Bir ağacın arkasına geçtiğinizde ağaç yarı saydam olur ve karakteriniz görünür kalır. Oyuncunun başladığı orta alan açık.
+- **Karanlık atmosfer:** gece. Oyuncunun etrafında küçük bir ışık halkası var; nişan yönünde, kenarları yumuşak bir el feneri konisi yanıyor. Ateş edince namlu parlaması etrafı kısa süre aydınlatıyor, patlamalar da ışık saçıyor. Renkler soğuk ve soluk (hafif mavi-yeşil), ekran kenarlarında vinyet var, yerde hafif sis kayıyor. Karanlıktaki zombilerin gözleri parlıyor (boss'unki kırmızı).
+- **Kan izleri:** ölen zombi yerde, son vuruş yönüne uzanan bir kan izi bırakır ve iz yavaşça kaybolur. Yaralı zombiler yürürken kan damlatır.
 - Bir dalgada son 5 zombi kaldığında, ekran dışındakiler kenardaki kırmızı oklarla gösterilir. En yüksek skor tarayıcıda saklanır.
 
 ### Özellikler (15 tane)
@@ -61,7 +64,10 @@ Sesler tarayıcı kuralları gereği ilk tıklama ya da dokunuştan sonra başla
 Bütün ayarlar `index.html` içindeki `<script>` bloğunun başında, **`CONFIG`** objesinde duruyor:
 
 - `CONFIG.player`: can (100), hız, atış hızı (3/sn), mermi hasarı (10), ölümsüzlük süresi (0,5 sn), çarpışma yarıçapı.
-- `CONFIG.zombies`: her türün canı, hızı, çarpışma yarıçapı (`radius`, ayaklarda), mermi isabet alanı (`hitRadius`, `hitLift`: gövdenin ortası), hasarı, puanı; boss'un atılma ayarları.
+- `CONFIG.zombies`: her türün canı, hızı, ayaktaki hareket çarpışması (`radius`), hasarı, puanı; boss'un atılma ayarları.
+- `CONFIG.hitbox.scale`: hitbox dairesinin görsele göre oranı (0.85 = görselden biraz küçük).
+- `CONFIG.light`: karanlık oranı (`darkness`), oyuncunun etrafındaki ışık yarıçapı (`radius`), fener menzili ve açısı (`coneRange`, `coneAngle`), namlu ışığı (`muzzleRadius`, `muzzleTime`), vinyet, soluklaşma (`desaturate`), soğuk ton (`tint`), sis (`fogAlpha`, `fogSpeed`), göz parlaklığı (`eyeGlow`). Karanlığı kapatmak için `darkness: 0`.
+- `CONFIG.effects`: kan izinin ömrü (`decalLife`), damla sıklığı ve ömrü, parçacık sınırı.
 - `CONFIG.sprites`: sprite'ların büyütme oranları (1 sanat pikseli = kaç dünya pikseli), ağaç/çalı/kaya/çit boyutları, zemin piksel boyutu.
 - `CONFIG.anim`: zombi animasyonu. Tür başına `freq` (saniyedeki zıplama), `bob` (zıplama yüksekliği), `squash` (ezilme/uzama), `sway` (sallanma açısı); dururken hız çarpanı (`idleFactor`); oyuncunun yürüme karesi hızı.
 - `CONFIG.audio`: genel ses, müzik ve her efektin ses seviyesi.
@@ -127,7 +133,9 @@ Oyun kodu (`index.html`) bu projeye aittir.
 ## Teknik notlar
 
 - Zemin 500x500'lük parçalar halinde, düşük çözünürlükte bir kez üretiliyor ve pikselli büyütülerek çiziliyor. Ekranın dışında kalan nesneler çizilmiyor.
-- Nesneler ve karakterler ayak noktalarına göre sıralanıyor (2.5D). Çarpışma ayaklarda, mermi isabeti gövdenin ortasında hesaplanıyor.
+- Nesneler ve karakterler ayak noktalarına göre sıralanıyor (2.5D). Engellerle ve birbirleriyle çarpışma ayaklardaki küçük dairelerle hesaplanıyor.
+- **Hitbox:** her zombi sprite'ı (ZombiePack'in 64 karesi, Zombie1/2) ve oyuncu gövdesi için hitbox, görünen (opak) piksellerden önceden ölçüldü. Merkez opak piksellerin ortalaması, yarıçap aynı alana sahip dairenin yarıçapı; şeffaf kenarlar sayılmıyor. Daire zıplama animasyonunu da takip ediyor. Mermi isabeti, oyuncuya temas (hasar ve itme), bıçaklar ve patlamalar aynı hitbox'ı kullanıyor. `H` tuşu bu daireleri gösteriyor: kırmızı zombi, yeşil oyuncu, sarı kesikli ayak çarpışması.
+- **Işık:** yarım çözünürlüklü bir katman karanlıkla dolduruluyor, ışıklar yumuşak gradyanlarla bu katmandan siliniyor. Fener konisinin yumuşak kenarı, farklı genişlikteki 6 koninin üst üste binmesiyle elde ediliyor.
 - Zombiler oyuncudan dışa doğru hesaplanan bir akış alanını (40 px'lik ızgarada Dijkstra) takip ederek engellerin etrafından dolaşıyor.
 - `file://` ile açıldığında görseller canvas'a yalnızca çiziliyor, pikselleri okunmuyor; böylece tarayıcı güvenlik kısıtlamalarına takılmıyor.
-- Otomatik testte 10 dalganın tamamı bot ile oynandı. 45 zombi aynı anda ekrandayken bir karenin güncellemesi en fazla ~2 ms, çizimi ~4 ms sürüyor.
+- Otomatik testte 10 dalganın tamamı bot ile oynandı. Karanlık katmanıyla birlikte çizim GPU'suz bir test tarayıcısında tipik olarak ~3 ms, en kötü ~9 ms; güncelleme tipik olarak ~1 ms sürüyor.
