@@ -46,7 +46,9 @@ Sesler tarayıcı kuralları gereği ilk tıklama ya da dokunuştan sonra başla
 
 ### Doom modu
 
-- **Tempo:** karakter hızlı (300 px/sn), zombiler daha hızlı ve kalabalık (dalga başına 24 → 135, aynı anda 100'e kadar; doğma aralığı 0,5 → 0,13 sn). Yakına gelen zombiler kısa süre hızlanıp size atılır; sürekli hareket etmeniz gerekir.
+- **Tempo:** karakter hızlı (300 px/sn), zombiler hızlı ve kalabalık (dalga başına 20 → 110, aynı anda 85'e kadar; doğma aralığı 0,55 → 0,16 sn). Zorluk dalga dalga yumuşakça artar: yeni çıkan koşucu ve tankların oranı birkaç dalgada tam değerine ulaşır.
+- **Can:** 130. Hasar sonrası ölümsüzlük yok, ama aynı zombi en fazla saniyede bir vurabilir. Zombilerden nadiren can paketi düşer (+20 can; can doluyken yerde bekler).
+- **Nefes alma:** kart seçiminden sonra yeni dalga 3,5 saniye geri sayımla başlar. Yakına gelen zombiler kısa süre hızlanıp size atılır; sürekli hareket etmeniz gerekir.
 - **Silahlar:**
 
   | Tuş | Silah | Özellik | Şarjör / yedek |
@@ -104,7 +106,8 @@ Sesler tarayıcı kuralları gereği ilk tıklama ya da dokunuştan sonra başla
 
 Bütün ayarlar `index.html` içindeki `<script>` bloğunun başında, **`CONFIG`** objesinde duruyor:
 
-- `CONFIG.player`: can (100), hız (300), tabancanın atış hızı (5/sn) ve hasarı (11), ölümsüzlük süresi (0,5 sn), çarpışma yarıçapı.
+- `CONFIG.player`: can (130), hız (300), hasar sonrası ölümsüzlük (`invulnTime`: 0 = yok), aynı zombinin iki vuruşu arası en kısa süre (`zombieHitCooldown`: 1 sn), çarpışma yarıçapı.
+- `CONFIG.healthPack`: can paketi düşme olasılığı (normal %3, tank/boss %12), verdiği can (20), yerde kalma süresi.
 - `CONFIG.weapons`: her silah için hasar (`damage`), atış hızı (`fireRate`), şarjör (`mag`), şarjör değiştirme süresi (`reloadTime`), mermi hızı (`bulletSpeed`), menzil, yayılma, saçma sayısı, yakın/uzak hasar çarpanı, delme (`pierce`), patlama yarıçapı ve hasarı, geri itme, geri tepme, ekran sarsıntısı, hit-stop, başlangıç/en fazla yedek mermi, kutudan gelen mermi ve eldeki boyut (`scale`).
 - `CONFIG.weaponAnim`: silah değiştirme süresi ve ateş animasyonunun kare hızı.
 - `CONFIG.ammo`: mermi kutusu düşme olasılıkları, silahlara göre dağılım (`shares`), kutunun ömrü, mıknatıs ve toplama mesafesi.
@@ -121,7 +124,7 @@ Bütün ayarlar `index.html` içindeki `<script>` bloğunun başında, **`CONFIG
 - `CONFIG.sprites`: sprite'ların büyütme oranları (1 sanat pikseli = kaç dünya pikseli), ağaç/çalı/kaya/çit boyutları, zemin piksel boyutu.
 - `CONFIG.anim`: zombi animasyonu. Tür başına `freq` (saniyedeki zıplama), `bob` (zıplama yüksekliği), `squash` (ezilme/uzama), `sway` (sallanma açısı); dururken hız çarpanı (`idleFactor`); oyuncunun yürüme karesi hızı.
 - `CONFIG.audio`: genel ses, müzik ve her efektin ses seviyesi.
-- `CONFIG.waves`: dalga başına zombi sayıları (`counts`: 24 → 135), aynı anda en fazla zombi (`maxAlive`: 100), doğma aralığı (`spawnIntervalFirst`/`Last`: 0,5 → 0,13 sn), dalga başına can/hız artışı, doğma aralıkları, koşucu ve tankların hangi dalgadan itibaren çıkacağı.
+- `CONFIG.waves`: dalga başına zombi sayıları (`counts`: 20 → 110), aynı anda en fazla zombi (`maxAlive`: 85), doğma aralığı (`spawnIntervalFirst`/`Last`: 0,55 → 0,16 sn), grup büyüklüğü (`groupPerWave`), yeni türlerin oranının kaç dalgada tam değere çıkacağı (`typeRampWaves`), dalga arası nefes süresi (`breather`: 3,5 sn), dalga başına can/hız artışı, doğma aralıkları, koşucu ve tankların hangi dalgadan itibaren çıkacağı.
 - `CONFIG.upgrades.rarityWeights`: kartların nadirlik olasılıkları.
 - `CONFIG.world`: harita boyutu (3000x3000), engel ve dekor sayıları, ortadaki açık alanın yarıçapı.
 - `CONFIG.camera`: yakınlaştırma ve kamera takip yumuşaklığı.
