@@ -17,7 +17,8 @@ Telefonda oynamak için klasörü olduğu gibi bir statik sunucuya (ör. GitHub 
 | Hareket | `W A S D` veya ok tuşları | Sol alttaki joystick (ekranın sol yarısında herhangi bir yere dokunun) |
 | Nişan | Mouse | Sağ alttaki joystick |
 | Ateş | Sol tık (basılı tutunca sürekli ateş) | Sağ joystick'i çekince otomatik ateş |
-| Silah değiştir | `1` tabanca, `2` pompalı, `3` roketatar; `Q` veya fare tekerleği sıradaki | SİLAH butonu (sıradaki silah) |
+| Silah değiştir | `1` tabanca, `2` pompalı, `3` roketatar, `4` makineli, `5` keskin nişancı; `Q` veya fare tekerleği sıradaki | SİLAH butonu (sıradaki silah) |
+| Şarjör değiştir | `R` (şarjör boşalınca otomatik) | ŞARJ butonu |
 | Dash | `Shift` veya `Boşluk` | DASH butonu |
 | İnfaz | `E` (parlayan zombinin yakınında) | İNFAZ butonu (hedef varken turuncu yanar) |
 | Duraklat | `ESC` veya `P` | Sağ üstteki duraklat butonu |
@@ -36,25 +37,29 @@ Sesler tarayıcı kuralları gereği ilk tıklama ya da dokunuştan sonra başla
   - **Normal:** orta hız, orta can. Görünümü ZombiePack'teki 60 farklı zombiden rastgele seçilir.
   - **Koşucu:** hızlı ama az canlı. 4. dalgadan itibaren çıkar.
   - **Tank:** yavaş, büyük, çok canlı (itfaiyeci zombi). 6. dalgadan itibaren çıkar.
-  - **Dev Zombi (Boss):** 10. dalgada gelir (korsan kaptan). Ekranın üstünde kendi can barı var. Ara ara kırmızı bir uyarı alanı gösterip o yöne hızla atılır; kırmızı alandan çekilin. Canı yarıya inince öfkelenir.
+  - **Azrail (Boss):** 10. dalgada gelir; tırpanlı, süzülen bir ölüm meleği. Ekranın üstünde kendi can barı var. Animasyonları duruma göre oynar: süzülme, tırpan savurma (yakındaysanız 30 hasar), kırmızı uyarı alanından sonra karanlık hamleyle atılma ve etrafına 4 gölge yaratık çağırma. Canı yarıya inince öfkelenir. Ölünce ölüm animasyonu, zincirleme büyük patlama, güçlü ekran sarsıntısı ve kısa bir ağır çekim olur.
 - Ağaçlar, kayalar ve demir çitler hem sizi hem zombileri hem de mermileri durdurur. Çalılar, mezar taşları, tabelalar ve çiçekler sadece süs.
 - Nesneler derinliğe göre sıralanır. Bir ağacın arkasına geçtiğinizde ağaç yarı saydam olur ve karakteriniz görünür kalır. Oyuncunun başladığı orta alan açık.
-- **Karanlık atmosfer:** gece. Oyuncunun etrafında küçük bir ışık halkası var; nişan yönünde, kenarları yumuşak bir el feneri konisi yanıyor. Ateş edince namlu parlaması etrafı kısa süre aydınlatıyor, patlamalar da ışık saçıyor. Renkler soğuk ve soluk (hafif mavi-yeşil), ekran kenarlarında vinyet var, yerde hafif sis kayıyor. Karanlıktaki zombilerin gözleri parlıyor (boss'unki kırmızı).
+- **Atmosfer:** karartma ve el feneri yok, harita tamamen görünür. Sadece hafif bir kenar vinyeti ve hafif soğuk bir renk tonu var (`CONFIG.light`).
 - **Kan izleri:** ölen zombi yerde, son vuruş yönüne uzanan bir kan izi bırakır ve iz yavaşça kaybolur. Yaralı zombiler yürürken kan damlatır.
 - Bir dalgada son 5 zombi kaldığında, ekran dışındakiler kenardaki kırmızı oklarla gösterilir. En yüksek skor tarayıcıda saklanır.
 
 ### Doom modu
 
-- **Tempo:** karakter hızlı (300 px/sn), zombiler daha hızlı ve kalabalık (dalga başına 16 → 90, aynı anda 70'e kadar). Yakına gelen zombiler kısa süre hızlanıp size atılır; sürekli hareket etmeniz gerekir.
+- **Tempo:** karakter hızlı (300 px/sn), zombiler daha hızlı ve kalabalık (dalga başına 24 → 135, aynı anda 100'e kadar; doğma aralığı 0,5 → 0,13 sn). Yakına gelen zombiler kısa süre hızlanıp size atılır; sürekli hareket etmeniz gerekir.
 - **Silahlar:**
 
-  | Silah | Özellik | Mermi |
-  |---|---|---|
-  | Tabanca | Hızlı (saniyede 5 atış); özellik kartlarının çoğu buna etki eder | Sınırsız |
-  | Pompalı | 9 saçmalı geniş atış, yakından devasa hasar, zombileri geriye uçurur, sizi geri iter | 16 ile başlar, en fazla 48 |
-  | Roketatar | Alan hasarlı patlama, zombileri savurur | 5 ile başlar, en fazla 15 |
+  | Tuş | Silah | Özellik | Şarjör / yedek |
+  |---|---|---|---|
+  | 1 | Tabanca | Hızlı (saniyede 5 atış); özellik kartlarının çoğu buna etki eder | 12 / sınırsız |
+  | 2 | Pompalı | 9 saçmalı geniş atış, yakından devasa hasar, zombileri geriye uçurur, sizi geri iter | 6 / 18 (en fazla 48) |
+  | 3 | Roketatar | Duman izli roket, alan hasarlı patlama, zombileri savurur | 1 / 5 (en fazla 15) |
+  | 4 | Makineli (AK-47) | Saniyede 11 atış, biraz dağınık | 30 / 60 (en fazla 210) |
+  | 5 | Keskin Nişancı (KAR98) | 130 hasar, 8 zombiyi delip geçer, yavaş | 5 / 10 (en fazla 30) |
 
-  Ölen zombilerden mermi kutusu düşer (yeşil: saçma, kırmızı: roket; tank ve boss daha sık düşürür). Kutular yakındayken size doğru çekilir. Mermi bitince tabancaya geçilir.
+  Silah elde tutulur, fareye doğru döner, sola nişan alınca dikey çevrilir. Mermi her silahın kendi namlu noktasından çıkar; her silahın mermisi farklı (küçük mermi, saçma, duman izli roket). Ateşte namlu parlaması, hafif geri tepme ve yere düşen boş kovan var; sprite sayfalarındaki ateş ve şarjör değiştirme animasyonları oynatılır. Silah değiştirirken kısa bir indirme/kaldırma animasyonu var. Sağ altta silah ikonu, şarjördeki ve yedekteki mermi sayısı görünür; şarjör değiştirirken dolum çubuğu çıkar.
+
+  Ölen zombilerden mermi kutusu düşer (pompalı, makineli, keskin nişancı veya roket için; tank ve boss daha sık düşürür). Kutular yakındayken size doğru çekilir. Bir silahın hiç mermisi kalmayınca tabancaya geçilir.
 - **Dash:** kısa ve hızlı bir atılma. Dash sırasında hasar almazsınız. Dolum süresi silah panelinin altındaki mavi çubukta görünür.
 - **İnfaz:** canı %25'in altına düşen zombi turuncu parlar (boss için %10). Yanındayken `E`'ye basınca karakter atılıp onu parçalar; 20 can ve kısa bir ölümsüzlük kazanırsınız.
 - **Kombo:** arka arkaya öldürmeler kombo sayacını artırır. Her 5 öldürmede skor çarpanı 1 artar (en fazla x8). 5, 10, 20, 35 ve 50. öldürmelerde "BRUTAL!", "SAVAGE!", "UNSTOPPABLE!", "MASSACRE!", "GODLIKE!" yazıları çıkar. 3 saniye öldürme olmazsa kombo sıfırlanır.
@@ -100,22 +105,23 @@ Sesler tarayıcı kuralları gereği ilk tıklama ya da dokunuştan sonra başla
 Bütün ayarlar `index.html` içindeki `<script>` bloğunun başında, **`CONFIG`** objesinde duruyor:
 
 - `CONFIG.player`: can (100), hız (300), tabancanın atış hızı (5/sn) ve hasarı (11), ölümsüzlük süresi (0,5 sn), çarpışma yarıçapı.
-- `CONFIG.weapons`: pompalı ve roketatarın atış hızı, saçma sayısı, yayılma, yakın/uzak hasar çarpanı, menzil, geri itme, geri tepme, ekran sarsıntısı, hit-stop, patlama yarıçapı, başlangıç/en fazla mermi ve kutudan gelen mermi.
-- `CONFIG.ammo`: mermi kutusu düşme olasılıkları, roket/saçma oranı, kutunun ömrü, mıknatıs ve toplama mesafesi.
+- `CONFIG.weapons`: her silah için hasar (`damage`), atış hızı (`fireRate`), şarjör (`mag`), şarjör değiştirme süresi (`reloadTime`), mermi hızı (`bulletSpeed`), menzil, yayılma, saçma sayısı, yakın/uzak hasar çarpanı, delme (`pierce`), patlama yarıçapı ve hasarı, geri itme, geri tepme, ekran sarsıntısı, hit-stop, başlangıç/en fazla yedek mermi, kutudan gelen mermi ve eldeki boyut (`scale`).
+- `CONFIG.weaponAnim`: silah değiştirme süresi ve ateş animasyonunun kare hızı.
+- `CONFIG.ammo`: mermi kutusu düşme olasılıkları, silahlara göre dağılım (`shares`), kutunun ömrü, mıknatıs ve toplama mesafesi.
 - `CONFIG.dash`: dash hızı, süresi, dolum süresi; "Koçbaşı" kartının hasarı.
 - `CONFIG.glory`: infaz eşikleri (%25, boss %10), menzil, verdiği can, ölümsüzlük süresi, hit-stop, sarsıntı.
 - `CONFIG.combo`: kombo süresi, skor çarpanı adımı ve üst sınırı, ekranda çıkan yazılar.
 - `CONFIG.barrels`: varil sayısı, canı, patlama hasarı ve yarıçapı, zincirleme gecikme, oyuncuya hasarı (`playerDamage: 0` ile kapatılır).
 - `CONFIG.feel`: hit-stop üst sınırı (60 ms), hasar sayıları, et parçası sayısı, "Zincirleme" kartının patlaması.
 - `CONFIG.music`: varsayılan müzik/efekt sesi, şarkı geçiş süresi, menü/savaş/yoğun savaş/dalga arası/duraklatma ses çarpanları.
-- `CONFIG.zombies`: her türün canı, hızı, ayaktaki hareket çarpışması (`radius`), hasarı, puanı; boss'un atılma ayarları; yakındaki zombilerin atılması (`lunge`).
+- `CONFIG.zombies`: her türün canı, hızı, ayaktaki hareket çarpışması (`radius`), hasarı, puanı; boss'un atılma, tırpan savurma (`meleeDamage`, `meleeRadius`), çağırma (`summonCount`) ve ölüm ağır çekimi (`deathSlowmo`, `slowmoTime`) ayarları; çağrılan yaratıklar (`minion`); yakındaki zombilerin atılması (`lunge`).
 - `CONFIG.hitbox.scale`: hitbox dairesinin görsele göre oranı (0.85 = görselden biraz küçük).
-- `CONFIG.light`: karanlık oranı (`darkness`), oyuncunun etrafındaki ışık yarıçapı (`radius`), fener menzili ve açısı (`coneRange`, `coneAngle`), namlu ışığı (`muzzleRadius`, `muzzleTime`), vinyet, soluklaşma (`desaturate`), soğuk ton (`tint`), sis (`fogAlpha`, `fogSpeed`), göz parlaklığı (`eyeGlow`). Karanlığı kapatmak için `darkness: 0`.
+- `CONFIG.light`: kenar vinyeti (`vignette`, 0.32), hafif soğuk ton (`tint`, `'#ffffff'` = kapalı), soluklaşma (`desaturate`). Karartma ve el feneri kapalı (`darkness: 0`); eski gece modu için `darkness: 0.86`, `fogAlpha` ve `eyeGlow` değerleri artırılabilir.
 - `CONFIG.effects`: kan izinin ömrü (`decalLife`), damla sıklığı ve ömrü, parçacık sınırı (dolunca en eski parçacıkların yerine yazılır).
 - `CONFIG.sprites`: sprite'ların büyütme oranları (1 sanat pikseli = kaç dünya pikseli), ağaç/çalı/kaya/çit boyutları, zemin piksel boyutu.
 - `CONFIG.anim`: zombi animasyonu. Tür başına `freq` (saniyedeki zıplama), `bob` (zıplama yüksekliği), `squash` (ezilme/uzama), `sway` (sallanma açısı); dururken hız çarpanı (`idleFactor`); oyuncunun yürüme karesi hızı.
 - `CONFIG.audio`: genel ses, müzik ve her efektin ses seviyesi.
-- `CONFIG.waves`: dalga başına zombi sayıları (`counts`: 16 → 90), aynı anda en fazla zombi (70), dalga başına can/hız artışı, doğma aralıkları, koşucu ve tankların hangi dalgadan itibaren çıkacağı.
+- `CONFIG.waves`: dalga başına zombi sayıları (`counts`: 24 → 135), aynı anda en fazla zombi (`maxAlive`: 100), doğma aralığı (`spawnIntervalFirst`/`Last`: 0,5 → 0,13 sn), dalga başına can/hız artışı, doğma aralıkları, koşucu ve tankların hangi dalgadan itibaren çıkacağı.
 - `CONFIG.upgrades.rarityWeights`: kartların nadirlik olasılıkları.
 - `CONFIG.world`: harita boyutu (3000x3000), engel ve dekor sayıları, ortadaki açık alanın yarıçapı.
 - `CONFIG.camera`: yakınlaştırma ve kamera takip yumuşaklığı.
@@ -133,7 +139,8 @@ assets/
              Menu görselleri (Play, Upgrade, pano, logo), Overlay ikonları (duraklat, devam, çıkış, ateş),
              cursors/ (Kenney Cursor Pixel Pack: nişangah ve el imleci)
   icons/     PowerUps ikonları (can, alev, hız)
-  weapons/   Pompalı ve roketatar görselleri
+  weapons/   pistol, shotgun, rocket, rifle, sniper: ateş/şarjör sprite sayfaları, namlu parlaması, mermi
+  boss/      Azrail: süzülme, saldırı, yetenek, çağırma, ölüm; gölge yaratık animasyonları
   audio/     Efekt sesleri (boom.mp3 dahil)
   music/     Çalma listesi (8 parça, MP3)
   unused/    Oyunda kullanılmayan dosyalar
@@ -145,7 +152,8 @@ Hangi parça nerede kullanılıyor:
 - **Zombiler:** ZombiePack'te yürüme animasyonu yok. Normal, tank ve boss için kodla sinüs zıplama, squash & stretch ve sallanma eklendi; her zombi farklı zamanda zıplıyor, gölge yerde sabit kalıyor. Koşucu, Zombie1/2'nin 2 kareli yürüyüşünü kullanıyor.
 - **Harita:** FreeEnvironment'tan çam ağaçları, kuru ağaç, kaya, çalılar ve renkli çalılar; Background'dan demir çit; Zombie paketinden mezar taşı.
 - **Arayüz:** Pixel UI pack 3 parçaları 9-slice (CSS `border-image` ve canvas) ile butonlarda, panellerde, kart çerçevelerinde, can barlarında, boss barında ve joystick düğmelerinde kullanılıyor.
-- **Silahlar:** tabanca karakterin kendi silahı (Player sprite'ından kesiliyor), pompalı `shotgun.png`, roketatar `rpg.png` (`rocket_launcher.png`). Silahlar nişan yönüne döner; namlu ve egzoz noktaları sprite üzerinden hesaplanıyor.
+- **Silahlar (assets3/weapons):** tabanca "Pistol - Second version" (80x48, efektsiz ateş + şarjör boşaltma), pompalı ve KAR98 V1.00 paketinden (ayrı namlu parlaması sayfası ile), makineli AK-47 ve roketatar (Bazooka M20) Guns V1.01 paketinden. El, namlu ve kovan çıkış noktaları her silahın karesi üzerinde ölçüldü (`WSPR`). HUD ikonu ateş sayfasının ilk karesinden kesiliyor.
+- **Boss (assets3/boss):** Azrail sprite sayfaları (100x100 kare) ve gölge yaratık (50x50). Hitbox görünen piksellerden ölçüldü.
 - **Sesler:** tık (butonlar), adım sesi (isabet), patlama 1 (zombi ölümü), patlama 2 (boss ölümü, patlayıcı mermi), hitHurt (hasar), powerUp 4 (dalga başlangıcı), powerUp 5 (dalga bitişi, özellik seçimi), jump (boss atılma uyarısı), arka plan müziği.
 
 Paketlerde karşılığı olmayan parçalar aynı piksel stilinde kodla çiziliyor:
@@ -153,7 +161,7 @@ Paketlerde karşılığı olmayan parçalar aynı piksel stilinde kodla çiziliy
 - **Zemin:** `Tiles/Tilemap` bir zemin karosu değil, Kenney'nin fare imleci paketi. Bu yüzden zemin (çimen, toprak, çakıl, çiçek) piksel piksel üretiliyor; imleç paketinden nişangah ve el imleçleri kullanılıyor.
 - **Özellik ikonları:** PowerUps'ta 15 özelliğe karşılık 3 farklı ikon var. Kalan 12 ikon, PowerUps'taki 16x16 çerçeve ve renk paletiyle çiziliyor.
 - **Doom modu:** patlayıcı varil, mermi kutuları, roket mermisi, ateş topu/duman/şok dalgası/et parçası efektleri ve müzik notası simgesi pakette yok, kodla çiziliyor.
-- **Sentezlenmiş sesler (Web Audio):** patlamalar gürültü + alçak geçiren filtre + derin bas ile üretiliyor ve türüne göre farklı tonda: roket derin ve uzun, varil daha ağır ve çatırtılı, öldürme patlaması kısa ve tiz, boss en derini. Pompalı, roket ateşleme, dash, infaz, mermi toplama, boş tetik ve kombo yazısı sesleri de sentezleniyor. Ayrıca `boom.mp3` boss ölümünde sentezle birlikte çalıyor. Tüm efektler bir kompresörden geçiyor; üst üste binen patlamalar cızırdamıyor.
+- **Sentezlenmiş sesler (Web Audio):** patlamalar gürültü + alçak geçiren filtre + derin bas ile üretiliyor ve türüne göre farklı tonda: roket derin ve uzun, varil daha ağır ve çatırtılı, öldürme patlaması kısa ve tiz, boss en derini. Pompalı, makineli, keskin nişancı, roket ateşleme, silah değiştirme, şarjör değiştirme, boss tırpanı ve çağırma, dash, infaz, mermi toplama, boş tetik ve kombo yazısı sesleri de sentezleniyor. Ayrıca `boom.mp3` boss ölümünde sentezle birlikte çalıyor. Tüm efektler bir kompresörden geçiyor; üst üste binen patlamalar cızırdamıyor.
 - **Diğerleri:** tahta tabelalar, ses butonu simgesi, ateş sesi (Web Audio ile üretilen kısa "pew"), kan ve parçacık efektleri, boss uyarı alanı, koruyucu bıçaklar.
 - **Font:** Pixel UI pack 3'te font dosyası yok. Metinlerde sistem fontu, piksel tarzı sert gölgelerle kullanılıyor.
 
@@ -166,7 +174,9 @@ Paketlerde karşılığı olmayan parçalar aynı piksel stilinde kodla çiziliy
 - Health ile birebir aynı olan PowerUps1
 - Tek tek `Tiles/` karoları (aynı içerik `ui/cursors/tilemap.png`'de)
 - ZombiePack'in tek tek sprite dosyaları (oyun sprite sayfasını kullanıyor)
-- `weapons/`: hafif makineli, saldırı tüfeği ve iki el bombası atar görseli (oyunda üç silah var)
+- `weapons/`: eski silah görselleri (hafif makineli, saldırı tüfeği, iki el bombası atar, eski pompalı ve roketatar)
+- `weapons-pack/`: assets3 silah paketinin kullanılmayan dosyaları (Glock, Revolver, MP5, kalın bazuka, tek tek sprite'lar, GIF'ler, tasarım görselleri)
+- `boss/`: Azrail'in Aseprite proje dosyaları ve tek satırlık yedek sayfa
 
 ## Lisanslar
 
@@ -174,7 +184,7 @@ Paketlerde karşılığı olmayan parçalar aynı piksel stilinde kodla çiziliy
 |---|---|
 | Tiles / Tilemap (Cursor Pixel Pack) | Kenney (www.kenney.nl), **CC0**: kişisel ve ticari kullanım serbest. Lisans dosyası: `assets/ui/cursors/License-Kenney.txt` |
 | ZombiePack | Özel lisans: `assets/zombies/LICENSE-ZombiePack.txt`. Oyunun parçası olarak ticari kullanım ve değiştirme serbest. Asset'lerin tek başına dağıtılması, satılması ve **ham dosyaların başkalarının indirebileceği şekilde sunulması yasak**. |
-| Player, Zombie, FreeEnvironment, Background, Pixel UI pack 3, PowerUps, Overlay, Menu, Logo, Audio, silah görselleri, `boom.mp3` | Lisans dosyası yok. Lisansı ve gerekli atıfı, dosyaları indirdiğiniz yerden kontrol edin. |
+| Player, Zombie, FreeEnvironment, Background, Pixel UI pack 3, PowerUps, Overlay, Menu, Logo, Audio, silah görselleri, assets3 silah ve boss paketleri, `boom.mp3` | Lisans dosyası yok. Lisansı ve gerekli atıfı, dosyaları indirdiğiniz yerden kontrol edin. |
 | `assets/music/` (Orman Gecesi hariç) | **Telifli ticari müzikler:** Mick Gordon (Doom Eternal OST), Doom OST, John Williams (Duel of the Fates), Krutikov Music ve çeşitli phonk parçaları. Dosya meta verilerine göre YouTube kaynaklı. Kişisel kullanım dışında yayınlamak için hak sahiplerinden izin gerekir. |
 
 > **Dikkat:** Bu depo herkese açıksa, `assets/` içindeki ham dosyalar herkes tarafından indirilebilir. Bu, ZombiePack lisansındaki "ham dosyaları indirilebilir şekilde sunma" yasağıyla çelişebilir. Daha da önemlisi, `assets/music/` içindeki telifli şarkıların herkese açık bir depoda veya yayınlanmış bir oyunda dağıtılması telif ihlali sayılabilir. Depoyu gizli tutmanızı; oyunu yayınlayacaksanız bu şarkıları telifsiz ya da lisanslı müziklerle değiştirmenizi öneririm (`PLAYLIST` listesinden kolayca değiştirilir).
@@ -186,7 +196,8 @@ Oyun kodu (`index.html`) bu projeye aittir.
 - Zemin 500x500'lük parçalar halinde, düşük çözünürlükte bir kez üretiliyor ve pikselli büyütülerek çiziliyor. Ekranın dışında kalan nesneler çizilmiyor.
 - Nesneler ve karakterler ayak noktalarına göre sıralanıyor (2.5D). Engellerle ve birbirleriyle çarpışma ayaklardaki küçük dairelerle hesaplanıyor.
 - **Hitbox:** her zombi sprite'ı (ZombiePack'in 64 karesi, Zombie1/2) ve oyuncu gövdesi için hitbox, görünen (opak) piksellerden önceden ölçüldü. Merkez opak piksellerin ortalaması, yarıçap aynı alana sahip dairenin yarıçapı; şeffaf kenarlar sayılmıyor. Daire zıplama animasyonunu da takip ediyor. Mermi isabeti, oyuncuya temas (hasar ve itme), bıçaklar ve patlamalar aynı hitbox'ı kullanıyor. `H` tuşu bu daireleri gösteriyor: kırmızı zombi, yeşil oyuncu, sarı kesikli ayak çarpışması.
-- **Işık:** düşük çözünürlüklü (ekranın %30'u) bir katman karanlıkla dolduruluyor, ışıklar yumuşak gradyanlarla bu katmandan siliniyor (oyuncu, fener, namlu, patlamalar, roketler, yanan variller). Fener konisinin yumuşak kenarı, farklı genişlikteki 4 koninin üst üste binmesiyle elde ediliyor. Soluk renkler için pahalı `saturation` karıştırması yerine ucuz bir gri-mavi örtü kullanılıyor.
+- **Işık:** varsayılan olarak karartma katmanı hiç çizilmiyor; sadece radyal gradyanlı bir kenar vinyeti ve `multiply` ile soğuk ton uygulanıyor. `darkness` 0'dan büyük yapılırsa düşük çözünürlüklü ışık katmanı (oyuncu, fener, namlu, patlamalar) yeniden devreye girer.
+- **Ağır çekim:** boss ölünce oyun zamanı `deathSlowmo` (0.3) hızına iner ve `slowmoTime` sonunda yumuşakça normale döner.
 - **Hit-stop:** güncelleme kısa süre atlanır, çizim devam eder; arka arkaya donmaları önlemek için bekleme süresi var.
 - **Takılma koruması:** yarım saniyede 10 pikselden az ilerleyen zombi engelin kenarı boyunca yana kayar. 8 saniye takılı kalan ve ekran dışında olan zombi harita kenarında yeniden doğar; dalgalar kilitlenmez.
 - **Müzik:** iki ses elemanı arasında çapraz geçiş yapılıyor. Dosyalar her tarayıcıda çalışsın diye MP3 (bazı Chromium sürümleri AAC/m4a çalamıyor).

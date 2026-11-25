@@ -318,10 +318,6 @@ const CONFIG = {
   player: {
     maxHp: 100,
     speed: 300,                  // piksel/saniye (Doom modu: hızlı)
-    fireRate: 5,                 // tabancanın saniyedeki atışı
-    damage: 11,                  // tabanca mermisi başı hasar
-    bulletSpeed: 850,
-    bulletRange: 700,
     radius: 15,                  // çarpışma yarıçapı (ayaklarda; sprite gövdesine göre)
     invulnTime: 0.5,             // hasar sonrası ölümsüzlük (saniye)
     critMultiplier: 2,           // kritik vuruş çarpanı
@@ -340,14 +336,19 @@ const CONFIG = {
       dashCooldownMin: 3.2, dashCooldownMax: 5.5, // atılma saldırıları arası süre
       dashWindup: 0.8,                            // atılmadan önce uyarı süresi
       dashSpeed: 600, dashDuration: 0.55, dashRange: 650, recoverTime: 0.6,
+      meleeRange: 150, meleeRadius: 130, meleeDamage: 30, meleeCooldown: 2.2, attackTime: 0.95, // tırpan savurma
+      summonCooldown: 9, summonTime: 0.7, summonCount: 4,                                    // yaratık çağırma
+      deathSlowmo: 0.3, slowmoTime: 1.4,                                                     // ölünce ağır çekim
     },
+    // Boss'un çağırdığı küçük gölge yaratıkları
+    minion: { hp: 35, speed: 150, radius: 12, damage: 10, score: 20, mass: 0.6, appearTime: 0.45 },
     // agresiflik: yakındaki normal/koşucu zombiler kısa süre hızlanıp oyuncuya atılır
     lunge: { range: 170, speedMul: 2.2, time: 0.3, cooldown: 1.8 },
   },
   // Sprite ölçekleri: 1 sanat pikseli kaç dünya pikseli olarak çizilsin
   sprites: {
     player: 3,
-    normal: 2.4, runner: 3.2, tank: 3.4, boss: 5.6,
+    normal: 2.4, runner: 3.2, tank: 3.4, boss: 5.6, bossSheet: 2.4, minion: 2.2, // boss: yedek (ZombiePack korsanı)
     trees: 1.3, bushes: 0.5, rocks: [0.5, 0.8], fence: 0.5, grave: 2.2,
     groundPixel: 2,              // zemin piksellerinin boyutu
     bullet: 0.75, muzzle: 1.2,
@@ -359,7 +360,8 @@ const CONFIG = {
     normal: { freq: 2.2, bob: 5, squash: 0.10, sway: 0.10 },
     runner: { freq: 4.4, bob: 4, squash: 0.12, sway: 0.16 },
     tank:   { freq: 1.3, bob: 4, squash: 0.14, sway: 0.06 },
-    boss:   { freq: 1.0, bob: 8, squash: 0.10, sway: 0.05 },
+    boss:   { freq: 1.0, bob: 8, squash: 0.06, sway: 0.04 },
+    minion: { freq: 3.0, bob: 5, squash: 0.12, sway: 0.12 },
     idleFactor: 0.3,             // dururken animasyon hızı çarpanı
     playerFrameRate: 9,          // oyuncu yürüme karesi hızı
   },
@@ -369,12 +371,12 @@ const CONFIG = {
   },
   waves: {
     total: 10,
-    counts: [16, 22, 28, 35, 42, 50, 58, 66, 76, 90], // her dalgadaki zombi sayısı (Doom modu: kalabalık)
+    counts: [24, 33, 42, 53, 63, 75, 87, 99, 114, 135], // her dalgadaki zombi sayısı (önceki değerlerin ~%50 fazlası)
     hpGrowth: 0.12,               // her dalgada zombi canı +%12
     speedGrowth: 0.04,            // her dalgada zombi hızı +%4
-    spawnIntervalFirst: 0.75,     // 1. dalgada zombi doğma aralığı (sn)
-    spawnIntervalLast: 0.2,       // son dalgada zombi doğma aralığı (sn)
-    maxAlive: 70,                 // aynı anda en fazla canlı zombi (performans)
+    spawnIntervalFirst: 0.5,      // 1. dalgada zombi doğma aralığı (sn)
+    spawnIntervalLast: 0.13,      // son dalgada zombi doğma aralığı (sn)
+    maxAlive: 100,                // aynı anda en fazla canlı zombi (performans)
     runnerFromWave: 4,            // koşucular 3. dalgadan SONRA çıkar
     tankFromWave: 6,              // tanklar 5. dalgadan SONRA çıkar
     runnerChance: 0.28, tankChance: 0.12,
@@ -394,18 +396,27 @@ const CONFIG = {
     maxDrips: 220, dripLife: 10, dripRate: 1.2, // yaralı zombilerin damlattığı kan (saniyede damla)
   },
   /* ===== Doom modu ===== */
-  // Silahlar: 1-2-3 tuşları / fare tekerleği / telefonda SİLAH butonu. Tabanca: CONFIG.player.damage ve fireRate
+  // Silahlar: 1-5 tuşları / fare tekerleği / telefonda SİLAH butonu. Her silahın değerleri ayrı.
+  // damage: mermi başı hasar, fireRate: saniyede atış, mag: şarjör, reloadTime: şarj süresi (sn),
+  // bulletSpeed/range: mermi hızı ve menzili, reserveStart/reserveMax: yedek mermi, pickup: kutudan gelen
   weapons: {
-    pistol:  { name: 'Tabanca', shake: 1.5, kick: 3 },
-    shotgun: { name: 'Pompalı', fireRate: 1.3, pellets: 9, spread: 0.6, damage: 10,
+    pistol:  { name: 'Tabanca', damage: 11, fireRate: 5, mag: 12, reloadTime: 1.0, bulletSpeed: 950, range: 720, spread: 0.02,
+               knockback: 1, shake: 1.5, kick: 3, reserveStart: Infinity, reserveMax: Infinity, pickup: 0, scale: 1.2 },
+    shotgun: { name: 'Pompalı', damage: 10, fireRate: 1.3, mag: 6, reloadTime: 1.6, pellets: 9, spread: 0.6,
                closeMult: 1.8, farMult: 0.45,           // yakından hasar çarpanı -> uzaktan
-               speed: 980, range: 420, knockback: 5, recoil: 420, shake: 11, kick: 14, hitstop: 0.05,
-               ammoStart: 16, ammoMax: 48, ammoPickup: 8 },
-    rocket:  { name: 'Roketatar', fireRate: 0.9, damage: 70, splashDamage: 90, radius: 130,
-               speed: 640, range: 950, recoil: 260, shake: 7, kick: 10, explodeShake: 16, hitstop: 0.06, knockback: 6,
-               ammoStart: 5, ammoMax: 15, ammoPickup: 2 },
+               bulletSpeed: 980, range: 420, knockback: 5, recoil: 420, shake: 11, kick: 14, hitstop: 0.05,
+               reserveStart: 18, reserveMax: 48, pickup: 8, scale: 0.72 },
+    rocket:  { name: 'Roketatar', damage: 70, splashDamage: 90, radius: 130, fireRate: 0.9, mag: 1, reloadTime: 1.3,
+               bulletSpeed: 640, range: 950, recoil: 260, shake: 7, kick: 10, explodeShake: 16, hitstop: 0.06, knockback: 6,
+               reserveStart: 5, reserveMax: 15, pickup: 2, scale: 0.72 },
+    rifle:   { name: 'Makineli (AK-47)', damage: 9, fireRate: 11, mag: 30, reloadTime: 1.8, bulletSpeed: 1150, range: 820, spread: 0.07,
+               knockback: 0.8, shake: 2.5, kick: 4, reserveStart: 60, reserveMax: 210, pickup: 30, scale: 0.85 },
+    sniper:  { name: 'Keskin Nişancı (KAR98)', damage: 130, fireRate: 0.85, mag: 5, reloadTime: 2.6, bulletSpeed: 2200, range: 1600, spread: 0,
+               pierce: 8, knockback: 3, recoil: 120, shake: 9, kick: 16, hitstop: 0.04, reserveStart: 10, reserveMax: 30, pickup: 5, scale: 0.7 },
   },
-  ammo: { dropChance: 0.22, tankDropChance: 0.8, rocketShare: 0.3, life: 16, magnet: 110, pickRadius: 34 },
+  weaponAnim: { switchTime: 0.28, shootFps: 30 }, // silah değiştirme süresi, ateş animasyonu kare hızı
+  // Mermi kutuları: düşme olasılığı ve hangi silaha ne oranda mermi düşeceği
+  ammo: { dropChance: 0.22, tankDropChance: 0.8, shares: { shotgun: 0.35, rifle: 0.3, rocket: 0.15, sniper: 0.2 }, life: 16, magnet: 110, pickRadius: 34 },
   dash: { speed: 950, time: 0.16, cooldown: 0.65, damage: 30, knockback: 6 }, // damage: "Dash hasar verir" kartı seviyesi başına
   glory: { threshold: 0.25, bossThreshold: 0.1, range: 170, dashTime: 0.16, heal: 20, healPerLevel: 15, invuln: 1.2, hitstop: 0.06, shake: 14 },
   combo: {
@@ -424,20 +435,20 @@ const CONFIG = {
   hitbox: { scale: 0.85 },
   // Karanlık atmosfer
   light: {
-    darkness: 0.86,              // karanlık oranı (0 = aydınlık, 1 = zifiri karanlık)
+    darkness: 0,                 // karanlık oranı (0 = kapalı, el feneri ve karartma yok; 0.86 = eski gece modu)
     radius: 140,                 // oyuncunun etrafındaki ışık halkasının yarıçapı (dünya px)
     coneRange: 480,              // el fenerinin menzili
     coneAngle: 0.42,             // fener konisinin yarı açısı (radyan)
     flicker: 0.04,               // fener titremesi
     muzzleRadius: 300, muzzleTime: 0.09, // ateş ederken namlu parlamasının aydınlattığı alan / süre
     color: '5,9,16',             // karanlığın rengi (r,g,b)
-    menuDarkness: 0.55,          // menüdeki karanlık
+    menuDarkness: 0,             // menüdeki karanlık
     resolution: 0.3,             // ışık katmanı çözünürlüğü (düşük = daha yumuşak ve hızlı)
-    vignette: 0.65,              // ekran kenarı kararması
-    desaturate: 0.38,            // renklerin soluklaşması (0-1)
-    tint: '#b2cfd0',             // soğuk mavi-yeşil ton (multiply)
-    fogAlpha: 0.13, fogSpeed: 14,// sis yoğunluğu ve kayma hızı
-    eyeGlow: 0.9,                // zombi gözlerinin parlaklığı
+    vignette: 0.32,              // hafif ekran kenarı kararması
+    desaturate: 0.12,            // renklerin hafif soluklaşması (0-1)
+    tint: '#dbe8ea',             // hafif soğuk ton (multiply; '#ffffff' = kapalı)
+    fogAlpha: 0, fogSpeed: 14,   // sis yoğunluğu ve kayma hızı (0 = kapalı)
+    eyeGlow: 0,                  // zombi gözlerinin parlaklığı (karanlıkta kullanılır)
   },
 };
 
@@ -512,7 +523,13 @@ const ASSET_FILES = {
   barFrame: 'assets/ui/bar_frame.png', barRed: 'assets/ui/bar_red.png', barYellow: 'assets/ui/bar_yellow.png', barGreen: 'assets/ui/bar_green.png',
   zbarFrame: 'assets/ui/zbar_frame.png', zbarRed: 'assets/ui/zbar_red.png', zbarYellow: 'assets/ui/zbar_yellow.png', zbarGreen: 'assets/ui/zbar_green.png',
   heart: 'assets/ui/heart.png', knobRed: 'assets/ui/knob_red.png', knobGreen: 'assets/ui/knob_green.png', shootIcon: 'assets/ui/shoot.png',
-  wShotgun: 'assets/weapons/shotgun.png', wRocket: 'assets/weapons/rocket_launcher.png',
+  wPistolShoot: 'assets/weapons/pistol/shoot.png', wPistolReload: 'assets/weapons/pistol/reload.png', bPistol: 'assets/weapons/pistol/bullet.png',
+  wShotgunShoot: 'assets/weapons/shotgun/shoot.png', wShotgunReload: 'assets/weapons/shotgun/reload.png', wShotgunFlash: 'assets/weapons/shotgun/flash.png',
+  wRocketShoot: 'assets/weapons/rocket/shoot.png', wRocketReload: 'assets/weapons/rocket/reload.png', bRocket: 'assets/weapons/rocket/rocket.png',
+  wRifleShoot: 'assets/weapons/rifle/shoot.png', wRifleReload: 'assets/weapons/rifle/reload.png', bRifle: 'assets/weapons/rifle/bullet.png',
+  wSniperShoot: 'assets/weapons/sniper/shoot.png', wSniperReload: 'assets/weapons/sniper/reload.png', wSniperFlash: 'assets/weapons/sniper/flash.png',
+  bossIdle: 'assets/boss/idle.png', bossAttack: 'assets/boss/attack.png', bossSkill: 'assets/boss/skill.png', bossSummon: 'assets/boss/summon.png', bossDeath: 'assets/boss/death.png',
+  minionAppear: 'assets/boss/minion_appear.png', minionIdle: 'assets/boss/minion_idle.png', minionDeath: 'assets/boss/minion_death.png',
   iconHealth: 'assets/icons/health.png', iconFire: 'assets/icons/fire.png', iconSpeed: 'assets/icons/speed.png',
 };
 const IMG = {};
@@ -539,7 +556,7 @@ function loadAssets(onDone) {
 }
 function onAssetsReady() {
   for (const k of ['player1', 'player2', 'player3']) { makeTint(k, '#ff3030'); makeTint(k, '#6fe3ff'); }
-  for (const k of ['zpack', 'runner1', 'runner2']) { makeTint(k, '#ffffff'); makeTint(k, '#ff2020'); makeTint(k, '#ff9a1a'); }
+  for (const k of ['zpack', 'runner1', 'runner2', 'bossIdle', 'bossAttack', 'bossSkill', 'bossSummon', 'minionAppear', 'minionIdle']) { makeTint(k, '#ffffff'); makeTint(k, '#ff2020'); makeTint(k, '#ff9a1a'); }
   iconCacheClear();
 }
 
@@ -673,6 +690,13 @@ const Sound = {
       case 'glory': this.tone(t, 0.45, 'sine', 95, 30, 1.0); this.noise(t, 0.28, 'lowpass', 2600, 180, 0.9); this.noise(t, 0.12, 'highpass', 3000, 1400, 0.5); break;
       case 'pickup': this.tone(t, 0.07, 'square', 660, 660, 0.12); this.tone(t + 0.07, 0.1, 'square', 990, 990, 0.12); break;
       case 'empty': this.tone(t, 0.06, 'square', 210, 150, 0.18); break;
+      case 'rifle': this.noise(t, 0.14, 'lowpass', 4200, 500, 0.6); this.tone(t, 0.08, 'square', 240, 90, 0.18); this.noise(t, 0.04, 'highpass', 3500, 2500, 0.25); break;
+      case 'sniper': this.noise(t, 0.6, 'lowpass', 5200, 160, 1.0); this.tone(t, 0.3, 'sine', 210, 40, 0.9); this.noise(t, 0.05, 'highpass', 4200, 3000, 0.45); this.noise(t + 0.12, 0.5, 'bandpass', 900, 300, 0.25, 1.2); break;
+      case 'switch': this.noise(t, 0.05, 'highpass', 2600, 1800, 0.25); this.tone(t + 0.05, 0.04, 'square', 520, 380, 0.08); break;
+      case 'reload': this.noise(t, 0.06, 'bandpass', 1800, 1200, 0.35, 3); this.tone(t, 0.05, 'square', 330, 260, 0.08); break;
+      case 'reloadEnd': this.noise(t, 0.05, 'bandpass', 2400, 1500, 0.4, 3); this.tone(t + 0.04, 0.06, 'square', 600, 420, 0.1); break;
+      case 'swing': this.noise(t, 0.35, 'bandpass', 600, 2800, 0.6, 2); break;
+      case 'summon': this.tone(t, 0.8, 'sawtooth', 55, 140, 0.25); this.tone(t, 0.8, 'sine', 82, 41, 0.4); this.noise(t, 0.7, 'bandpass', 300, 1200, 0.3, 4); break;
       case 'callout': this.tone(t, 0.35, 'sawtooth', 110, 220, 0.25); this.noise(t, 0.3, 'lowpass', 1500, 200, 0.4); break;
     }
   },
@@ -738,7 +762,8 @@ window.addEventListener('keydown', e => {
   }
   if ((state === 'menu') && (e.code === 'Enter' || e.code === 'Space')) newGame();
   else if (state === 'playing') {
-    const wk = { Digit1: 'pistol', Numpad1: 'pistol', Digit2: 'shotgun', Numpad2: 'shotgun', Digit3: 'rocket', Numpad3: 'rocket' }[e.code];
+    const wk = { Digit1: 'pistol', Numpad1: 'pistol', Digit2: 'shotgun', Numpad2: 'shotgun', Digit3: 'rocket', Numpad3: 'rocket', Digit4: 'rifle', Numpad4: 'rifle', Digit5: 'sniper', Numpad5: 'sniper' }[e.code];
+    if (e.code === 'KeyR') startReload();
     if (wk) setWeapon(wk);
     if (e.code === 'KeyQ') cycleWeapon(1);
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'Space') tryDash();
@@ -1473,7 +1498,9 @@ function createPlayer() {
     x: WW / 2, y: WH / 2, vx: 0, vy: 0, r: C.player.radius, angle: -Math.PI / 2,
     hp: C.player.maxHp, maxHp: C.player.maxHp, invuln: 0, fireCd: 0, muzzle: 0, recoil: 0, walk: 0,
     alive: true, deathTimer: 0, bladeAngle: 0, dk: 'p', frameT: 0, sortY: 0,
-    weapon: 'pistol', ammo: { shotgun: C.weapons.shotgun.ammoStart, rocket: C.weapons.rocket.ammoStart },
+    weapon: 'pistol', reload: null, switchT: 0, shootAnim: null,
+    mag: Object.fromEntries(Object.entries(C.weapons).map(([k, v]) => [k, v.mag])),          // şarjördeki mermi
+    ammo: Object.fromEntries(Object.entries(C.weapons).map(([k, v]) => [k, v.reserveStart])), // yedek mermi
     kbx: 0, kby: 0, dashT: 0, dashCd: 0, dashDx: 1, dashDy: 0, dashId: 0, ghosts: [], ghostT: 0, glory: null, gloryShield: 0, flash: 0,
     stats: { damageMult: 1, speedMult: 1, fireRateMult: 1, parallel: 1, spread: 0, pierce: 0, regen: 0, crit: 0,
              knockback: 1, lifesteal: 0, blades: 0, velocityMult: 1, explosive: 0, revives: 0,
@@ -1496,6 +1523,7 @@ function updatePlayer(dt) {
   }
   // zaman sayaçları
   p.dashCd -= dt; p.gloryShield -= dt;
+  updateWeapon(dt); // şarj, ateş ve değiştirme animasyonları
   for (let i = p.ghosts.length - 1; i >= 0; i--) { p.ghosts[i].life -= dt; if (p.ghosts[i].life <= 0) p.ghosts.splice(i, 1); }
   // --- İnfaz sırasında karakter hedefe atılır, kontroller devre dışı ---
   if (p.glory) { updateGlory(dt); resolveStatic(p); clampBounds(p); p.invuln -= dt; p.muzzle -= dt; return; }
@@ -1521,7 +1549,8 @@ function updatePlayer(dt) {
     else if (moving > 30 && !sticks.aim.active) p.angle = lerpAngle(p.angle, Math.atan2(p.vy, p.vx), 1 - Math.exp(-8 * dt));
   } else {
     const m = screenToWorld(input.mouseX, input.mouseY);
-    p.angle = Math.atan2(m.y - p.y, m.x - p.x);
+    const ph = playerHitbox(p, _hp); // nişan silahın tutulduğu gövde yüksekliğinden (yakın hedeflerde de isabetli)
+    p.angle = Math.atan2(m.y - ph.y, m.x - ph.x);
     firing = input.mouseDown;
   }
   p.fireCd -= dt;
@@ -1535,35 +1564,6 @@ function updatePlayer(dt) {
   p.bladeAngle += C.player.bladeSpeed * dt;
 }
 
-function shoot() {
-  const p = player, s = p.stats;
-  const spreadN = 1 + 2 * s.spread, step = 0.17;
-  const par = s.parallel;
-  const speed = C.player.bulletSpeed * s.velocityMult;
-  const life = (C.player.bulletRange * s.velocityMult) / speed;
-  const ca = Math.cos(p.angle), sa = Math.sin(p.angle);
-  const mz = gunMuzzle(p); // mermi silahın namlusundan çıkar
-  const bx = mz.x, by = mz.y;
-  for (let i = 0; i < spreadN; i++) {
-    const a = p.angle + (i - (spreadN - 1) / 2) * step;
-    const c = Math.cos(a), sn = Math.sin(a);
-    for (let j = 0; j < par; j++) {
-      const off = (j - (par - 1) / 2) * 9;
-      const crit = Math.random() < s.crit;
-      bullets.push({
-        x: bx - sa * off, y: by + ca * off, vx: c * speed, vy: sn * speed, speed, life,
-        dmg: C.player.damage * s.damageMult * (crit ? C.player.critMultiplier : 1),
-        crit, pierce: s.pierce, hits: [], size: crit ? 4 : 3,
-        // ilk karede çarpışma oyuncunun gövdesinden başlasın: yapışık zombiler de vurulabilsin
-        fromX: p.x, fromY: p.y - 20,
-      });
-    }
-  }
-  p.muzzle = 0.06; p.recoil = 1;
-  p.flash = C.light.muzzleTime; // namlu parlaması etrafı aydınlatır
-  Sound.shoot();
-  for (let i = 0; i < 2; i++) addParticle({ x: bx, y: by, vx: Math.cos(p.angle + rand(-0.5, 0.5)) * rand(150, 300), vy: Math.sin(p.angle + rand(-0.5, 0.5)) * rand(150, 300), life: 0.12, max: 0.12, size: 2, color: '#ffe066', drag: 6, kind: 1 });
-}
 
 function damagePlayer(amount, fx, fy) {
   const p = player;
@@ -1605,6 +1605,7 @@ const ZOMBIE_LOOKS = {
   runner: { skins: ['#b2cf6e', '#a5c25f'], shirts: ['#b8423a', '#c75b2a', '#a63d5a'], pants: '#2f2f3a' },
   tank:   { skins: ['#5d8a48', '#567f43'], shirts: ['#4b4e6d', '#3f4a5a'], pants: '#2a2d3a' },
   boss:   { skins: ['#6f8a3a'], shirts: ['#5b2a5e'], pants: '#2a1f2e' },
+  minion: { skins: ['#3a3340'], shirts: ['#1f1a24'], pants: '#120f16' },
 };
 function spawnZombie(type, x, y) {
   const t = C.zombies[type], n = wave.num, isBoss = type === 'boss';
@@ -1626,8 +1627,10 @@ function spawnZombie(type, x, y) {
   };
   if (isBoss) {
     z.state = 'chase'; z.timer = 0; z.dashCd = 3; z.dirX = 1; z.dirY = 0; z.enraged = false;
+    z.meleeCd = 1.5; z.summonCd = 4; z.swings = 0;
     wave.boss = z;
   }
+  if (type === 'minion') z.appearT = t.appearTime; // belirme animasyonu
   zombies.push(z);
   return z;
 }
@@ -1646,11 +1649,19 @@ function updateBoss(z, dt) {
   const dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy) || 1;
   if (!z.enraged && z.hp < z.maxHp * 0.5) {
     z.enraged = true;
-    showBanner('DEV ZOMBİ ÖFKELENDİ!', 'Daha hızlı ve daha sık saldırıyor', 1.8, '#ff6b6b');
+    showBanner('AZRAİL ÖFKELENDİ!', 'Daha hızlı ve daha sık saldırıyor', 1.8, '#ff6b6b');
   }
   switch (z.state) {
     case 'chase':
-      z.dashCd -= dt;
+      z.dashCd -= dt; z.meleeCd -= dt; z.summonCd -= dt;
+      if (p.alive && d < B.meleeRange && z.meleeCd <= 0) { // yakın: tırpan savurma
+        z.state = 'attack'; z.timer = B.attackTime; z.swings = 0; z.meleeCd = B.meleeCooldown * (z.enraged ? 0.7 : 1); z.face = dx > 0 ? 1 : -1;
+        return { vx: 0, vy: 0 };
+      }
+      if (p.alive && z.summonCd <= 0 && d < 800) { // yaratık çağırma
+        z.state = 'summon'; z.timer = B.summonTime; z.summonCd = B.summonCooldown * (z.enraged ? 0.7 : 1);
+        return { vx: 0, vy: 0 };
+      }
       if (z.dashCd <= 0 && d < B.dashRange && p.alive && navLOS(z.x, z.y, p.x, p.y)) {
         z.state = 'windup'; z.timer = B.dashWindup; z.dirX = dx / d; z.dirY = dy / d;
         Sound.play('dash', 0.2);
@@ -1671,6 +1682,17 @@ function updateBoss(z, dt) {
       z.timer -= dt;
       if (z.timer <= 0) { z.state = 'chase'; z.dashCd = rand(B.dashCooldownMin, B.dashCooldownMax) * (z.enraged ? 0.6 : 1); }
       return null;
+    case 'attack': { // iki savurma: animasyonun %30 ve %70'inde
+      z.timer -= dt;
+      const prog = 1 - z.timer / B.attackTime;
+      if ((z.swings === 0 && prog > 0.3) || (z.swings === 1 && prog > 0.7)) { z.swings++; bossSwing(z); }
+      if (z.timer <= 0) z.state = 'chase';
+      return { vx: dx / d * z.speed * 0.25, vy: dy / d * z.speed * 0.25 };
+    }
+    case 'summon':
+      z.timer -= dt;
+      if (z.timer <= 0) { bossSummon(z); z.state = 'chase'; }
+      return { vx: 0, vy: 0 };
   }
   return null;
 }
@@ -1679,8 +1701,9 @@ function updateZombies(dt) {
   const p = player;
   for (const z of zombies) {
     if (z.dead) continue;
-    z.hitFlash -= dt; z.bladeCd -= dt;
-    if (z.hp < z.maxHp * 0.6 && Math.random() < dt * C.effects.dripRate) addBloodDrip(z.x + rand(-6, 6), z.y + rand(-3, 2));
+    z.hitFlash -= dt; z.bladeCd -= dt; z.animClock = (z.animClock || 0) + dt;
+    if (z.appearT > 0) { z.appearT -= dt; continue; } // çağrılan yaratık beliriyor
+    if (z.type !== 'minion' && z.hp < z.maxHp * 0.6 && Math.random() < dt * C.effects.dripRate) addBloodDrip(z.x + rand(-6, 6), z.y + rand(-3, 2));
     if (z.frozen) { z.vx = z.vy = 0; z.kbx = z.kby = 0; continue; } // infaz ediliyor
     const override = z.type === 'boss' ? updateBoss(z, dt) : null;
     if (override) { z.vx = override.vx; z.vy = override.vy; }
@@ -1725,7 +1748,13 @@ function updateZombies(dt) {
       z.chkX = z.x; z.chkY = z.y; z.chkT = 0;
       if (z.stuckT >= 1 && !(z.unstuck > 0)) { z.unstuck = 0.7; z.unstuckA = Math.atan2(p.y - z.y, p.x - z.x) + (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2; }
       const offScreen = Math.abs(z.x - camX) > W / 2 / viewScale + 60 || Math.abs(z.y - camY) > H / 2 / viewScale + 60;
-      if (z.stuckT > 8 && offScreen) { const sp = findSpawnPoint(z.r); z.x = sp.x; z.y = sp.y; z.stuckT = 0; z.think = 0; }
+      // ilerleme kontrolü: oyuncuya uzun süre yaklaşamayan (engel arkasında salınan) zombi kenarda yeniden doğar
+      const pd = Math.hypot(p.x - z.x, p.y - z.y);
+      if (pd < (z.bestD ?? 1e9) - 25) { z.bestD = pd; z.noProgT = 0; } else z.noProgT = (z.noProgT || 0) + 0.5;
+      if (z.type !== 'boss' && pd > 250 && ((z.stuckT > 8 && offScreen) || (z.noProgT > 10 && offScreen) || z.noProgT > 14)) {
+        if (!offScreen) for (let i = 0; i < 6; i++) addParticle({ x: z.x, y: z.y - 20, vx: rand(-60, 60), vy: rand(-80, 0), life: 0.6, max: 0.6, size: 8, grow: 20, color: '#3a3a3a', drag: 3, kind: 3 });
+        const sp = findSpawnPoint(z.r); z.x = sp.x; z.y = sp.y; z.stuckT = 0; z.noProgT = 0; z.bestD = undefined; z.think = 0;
+      }
     }
     const sp = Math.hypot(z.vx, z.vy);
     if (z.state !== 'windup' && sp > 5) z.angle = lerpAngle(z.angle, Math.atan2(z.vy, z.vx), 1 - Math.exp(-8 * dt));
@@ -1789,13 +1818,17 @@ function killZombie(z, opts = {}) {
   const big = z.type === 'boss' ? 4 : z.type === 'tank' ? 1.6 : 1;
   Sound.play(z.type === 'boss' ? 'bossDeath' : 'death', z.type === 'boss' ? 0 : 0.06);
   const zh = zombieHitbox(z, _hb2), hx = zh.x, hy = zh.y;
-  spawnBlood(hx, hy, 0, 0, Math.round(14 * big), 260 * Math.sqrt(big), false);
-  for (let i = 0; i < 5 * big; i++) {
+  const spirit = (z.type === 'minion' && minionReady()) || (z.type === 'boss' && bossReady()); // gölge varlıklar kan bırakmaz
+  if (spirit) {
+    if (z.type === 'minion') addFx(MINION_ANIM.death, z.x, z.y, 0.4, C.sprites.minion, z.face, MINION_FOOT);
+    for (let i = 0; i < 8 * big; i++) { const a = rand(0, TAU), sp = rand(60, 200); addParticle({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.8, max: 0.8, size: rand(4, 9) * Math.sqrt(big), grow: 20, color: '#1c1822', drag: 3, kind: 3 }); }
+  } else spawnBlood(hx, hy, 0, 0, Math.round(14 * big), 260 * Math.sqrt(big), false);
+  for (let i = 0; i < (spirit ? 0 : 5 * big); i++) {
     const a = rand(0, TAU), sp = rand(60, 220);
     addParticle({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.4, 0.8), max: 0.8, size: rand(2.5, 4.5) * Math.sqrt(big), color: z.skin, drag: 4, kind: 0 });
   }
-  addBloodSplat(z.x, z.y, z.lastDx || 0, z.lastDy || 0, z.r / 16 * (opts.glory ? 1.6 : 1)); // yerde kalan, yavaşça kaybolan kan izi
-  spawnGibs(hx, hy, Math.round(C.feel.gibs * big * (opts.glory ? 2 : 1)), Math.sqrt(big) * (opts.glory ? 1.3 : 1)); // parçalara ayrılır
+  if (!spirit) addBloodSplat(z.x, z.y, z.lastDx || 0, z.lastDy || 0, z.r / 16 * (opts.glory ? 1.6 : 1)); // yerde kalan, yavaşça kaybolan kan izi
+  if (!spirit) spawnGibs(hx, hy, Math.round(C.feel.gibs * big * (opts.glory ? 2 : 1)), Math.sqrt(big) * (opts.glory ? 1.3 : 1)); // parçalara ayrılır
   dropAmmo(z);
   if (z.type === 'tank') addHitStop(0.035);
   const ke = player.stats.killExplode;
@@ -1805,11 +1838,15 @@ function killZombie(z, opts = {}) {
     if (Math.random() < 0.35) addText(player.x + rand(-10, 10), player.y - 28, '+' + player.stats.lifesteal, '#69db7c', 14, 0.6);
   }
   if (z.type === 'boss') {
-    shake = 22; wave.boss = null; addHitStop(0.06);
+    shake = 26; wave.boss = null; addHitStop(0.06);
+    // büyük patlama zinciri + ölüm animasyonu + kısa ağır çekim
+    if (bossReady()) addFx(BOSS_ANIM.death, z.x, z.y, 1.8, C.sprites.bossSheet, z.face, BOSS_FOOT);
+    for (let i = 0; i < 6; i++) queueExplosion(z.x + rand(-90, 90), z.y - rand(10, 130), { radius: 150, damage: 60, type: i === 0 ? 'barrel' : 'rocket', shake: 22, kb: 6 }, 0.05 + i * 0.14);
+    slowmoT = C.zombies.boss.slowmoTime;
     Sound.play('boom', 0); Sound.synth('explosion', 'boss');
     addLight(z.x, z.y - 60, 500, 0.8);
     addParticle({ x: z.x, y: z.y, vx: 0, vy: 0, life: 0.9, max: 0.9, size: 30, grow: 600, color: '#ff6b6b', drag: 0, kind: 2 });
-    showBanner('DEV ZOMBİ YENİLDİ!', '+' + z.score + ' puan', 2.2, '#ffd43b');
+    showBanner('AZRAİL YENİLDİ!', '+' + z.score + ' puan', 2.2, '#ffd43b');
   }
 }
 
@@ -1848,7 +1885,8 @@ const HB_PLAYER = [-0.2, -7.6, 6.36];  // Player1-3 gövdesi, silah hariç (sola
 // Zombinin hitbox'ı (zıplama animasyonunu da takip eder)
 function zombieHitbox(z, out = {}) {
   if (!imgOk(IMG.zpack)) { out.x = z.x; out.y = z.y; out.r = z.r; return out; } // yedek çizim: ayak dairesi
-  const sp = zombieSprite(z), hb = z.type === 'runner' ? HB_RUNNER : HB_ZPACK[z.sprite], a = zombieAnim(z);
+  const sp = zombieSprite(z), a = zombieAnim(z);
+  const hb = (z.type === 'boss' && bossReady()) ? HB_BOSS : (z.type === 'minion' && minionReady()) ? HB_MINION : (z.type === 'runner' || z.type === 'minion') ? HB_RUNNER : HB_ZPACK[z.sprite];
   out.x = z.x + z.face * hb[0] * sp.s;
   out.y = z.y - a.bob + hb[1] * sp.s * a.sy;
   out.r = hb[2] * sp.s * C.hitbox.scale;
@@ -1904,7 +1942,10 @@ function updateBullets(dt) {
             const W = C.weapons.shotgun, f = clamp((1 - b.life / b.maxLife) * 1.6, 0, 1);
             hitZombie(z, b.dmg * lerp(W.closeMult, W.farMult, f), dx, dy, W.knockback * player.stats.knockback * (1 - f * 0.6), b.crit, b.x, b.y);
             shotgunHit = true;
-          } else hitZombie(z, b.dmg, dx, dy, player.stats.knockback, b.crit, b.x, b.y);
+          } else {
+            hitZombie(z, b.dmg, dx, dy, (b.kb ?? 1) * player.stats.knockback, b.crit, b.x, b.y);
+            if (b.kind === 'sniper') addHitStop(C.weapons.sniper.hitstop);
+          }
           if (player.stats.explosive > 0) explode(b.x, b.y, b.dmg, z);
           if (b.hits.length > b.pierce) { dead = true; break; }
         }
@@ -1993,11 +2034,11 @@ function updateEffects(dt) {
     p.x += p.vx * dt; p.y += p.vy * dt;
     if (p.drag) { const d = Math.exp(-p.drag * dt); p.vx *= d; p.vy *= d; }
     if (p.grow) p.size += p.grow * dt;
-    if (p.kind === 4) { // et parçası: havada süzülüp yere düşer, kan izi bırakır
+    if (p.kind === 4 || p.kind === 6) { // et parçası / boş kovan: havada süzülüp yere düşer
       p.z += p.vz * dt; p.vz -= 1100 * dt; p.rot += p.vr * dt;
       if (p.z <= 0) {
         p.z = 0;
-        if (!p.landed) { p.landed = true; addBloodDrip(p.x, p.y); }
+        if (!p.landed) { p.landed = true; if (p.kind === 4) addBloodDrip(p.x, p.y); }
         p.vz = Math.abs(p.vz) > 60 ? -p.vz * 0.3 : 0; p.vx *= 0.55; p.vy *= 0.55; p.vr *= 0.5;
       }
     }
@@ -2011,6 +2052,7 @@ function updateEffects(dt) {
     else t.vy *= Math.exp(-3 * dt);
     if (t.life <= 0) texts.splice(i, 1);
   }
+  updateFx(dt);
   if (banner) { banner.t += dt; if (banner.t > banner.dur) banner = null; }
   hitVignette = Math.max(0, hitVignette - dt * 2.2);
   shake = Math.max(0, shake - dt * 30);
@@ -2035,7 +2077,7 @@ function startWave(n) {
   wave.startDelay = C.waves.startDelay; wave.spawnTimer = 0; wave.boss = null;
   if (world.barrels.length < C.barrels.count) spawnBarrels(Math.min(6, C.barrels.count - world.barrels.length)); // patlayan variller yenilenir
   let sub = '';
-  if (n === C.waves.total) sub = 'SON DALGA — DEV ZOMBİ YAKLAŞIYOR!';
+  if (n === C.waves.total) sub = 'SON DALGA — AZRAİL YAKLAŞIYOR!';
   else if (n === C.waves.tankFromWave) sub = 'Dikkat: Tank zombiler geliyor!';
   else if (n === C.waves.runnerFromWave) sub = 'Dikkat: Koşucu zombiler geliyor!';
   else if (n === 1) sub = 'Hayatta kal!';
@@ -2074,7 +2116,7 @@ function updateWaves(dt) {
         wave.queue.shift();
         const sp = findSpawnPoint(C.zombies.boss.radius);
         spawnZombie('boss', sp.x, sp.y);
-        showBanner('DEV ZOMBİ GELDİ!', 'Kırmızı çizgiye dikkat — atılma saldırısından kaç!', 2.6, '#ff6b6b');
+        showBanner('AZRAİL GELDİ!', 'Kırmızı alandan kaç, tırpanına yaklaşma!', 2.6, '#ff6b6b');
         shake = 12;
         wave.spawnTimer = interval * 3;
       } else {
@@ -2091,7 +2133,8 @@ function updateWaves(dt) {
         wave.spawnTimer = interval * Math.max(1, spawned) * rand(0.75, 1.25);
       }
     }
-    if (!wave.queue.length && zombies.length === 0 && player.alive) {
+    // boss ölümünde ağır çekim ve patlama zinciri bitmeden dalga tamamlanmasın
+    if (!wave.queue.length && zombies.length === 0 && player.alive && slowmoT <= 0 && explosionQueue.length === 0) {
       wave.active = false; wave.cleared = true; wave.clearTimer = C.waves.betweenWaveDelay;
       const bonus = C.waves.clearBonus * wave.num;
       score += bonus;
@@ -2112,48 +2155,420 @@ function updateWaves(dt) {
    DOOM MODU: silahlar, dash, infaz (glory kill), kombo, patlayıcı variller,
    mermi kutuları, patlamalar ve vuruş hissi (hit-stop, sarsıntı, parçalanma)
    ===================================================================== */
-const WEAPON_ORDER = ['pistol', 'shotgun', 'rocket'];
-// Silah sprite'ları: kırpma alanı, elin tuttuğu nokta ve namlu ucu (sprite pikseli)
-const WEAPON_SPRITES = {
-  pistol:  { key: 'player1',  crop: [4, 20, 15, 8], hand: [13, 4.5], muzzle: [0, 2.5], flipX: true,  scale: () => C.sprites.player },
-  shotgun: { key: 'wShotgun', crop: [0, 0, 39, 10], hand: [14, 5],   muzzle: [39, 2.5], flipX: false, scale: () => C.sprites.shotgun },
-  rocket:  { key: 'wRocket',  crop: [0, 0, 39, 16], hand: [27, 9],   muzzle: [39, 6], back: [0, 6], flipX: false, scale: () => C.sprites.rocket },
+const WEAPON_ORDER = ['pistol', 'shotgun', 'rocket', 'rifle', 'sniper'];
+// Silah sprite sayfaları: [asset, kare genişliği, kare yüksekliği, kare sayısı] + kare içindeki
+// el (tutma), namlu, kovan çıkışı noktaları ve ikon kırpma alanı (sanat pikseli)
+const WSPR = {
+  pistol:  { shoot: ['wPistolShoot', 80, 48, 8],   reload: ['wPistolReload', 80, 48, 23],
+             hand: [23, 22], muzzle: [47, 12.5], eject: [34, 11], casing: 'brass', icon: [19, 10, 28, 18] },
+  shotgun: { shoot: ['wShotgunShoot', 160, 32, 14], reload: ['wShotgunReload', 128, 32, 14], flash: ['wShotgunFlash', 160, 32, 14],
+             hand: [34, 19], muzzle: [98, 14.5], eject: [44, 14], casing: 'shell', icon: [4, 12, 94, 19] },
+  rocket:  { shoot: ['wRocketShoot', 192, 32, 8],   reload: ['wRocketReload', 192, 32, 16],
+             hand: [73, 22], muzzle: [147, 12], back: [35, 12], icon: [35, 7, 112, 24] },
+  rifle:   { shoot: ['wRifleShoot', 96, 48, 12],    reload: ['wRifleReload', 96, 48, 16],
+             hand: [41, 17], muzzle: [79, 9.5], eject: [44, 8], casing: 'brass', icon: [3, 5, 76, 22] },
+  sniper:  { shoot: ['wSniperShoot', 160, 32, 28],  reload: ['wSniperReload', 128, 32, 46], flash: ['wSniperFlash', 160, 32, 28],
+             hand: [38, 18], muzzle: [120, 10.5], eject: [42, 11], casing: 'brass', icon: [2, 9, 118, 20] },
 };
-function weaponSprite(w) {
-  const ws = WEAPON_SPRITES[w || 'pistol'];
-  return imgOk(IMG[ws.key]) ? ws : WEAPON_SPRITES.pistol;
-}
-// Silah üzerindeki bir noktanın dünya koordinatı (namlu, egzoz...)
-function weaponPoint(p, pt, ws = weaponSprite(p.weapon)) {
-  const pv = gunPivot(p), s = ws.scale();
-  const lx = (pt[0] - ws.hand[0]) * s * (ws.flipX ? -1 : 1);
-  let ly = (pt[1] - ws.hand[1]) * s;
-  if (Math.cos(p.angle) < 0) ly = -ly;
+// Görseller yüklenemezse karakterin eski (Player sprite'ındaki) silahı kullanılır
+const WEAPON_FALLBACK = { key: 'player1', crop: [4, 20, 15, 8], hand: [13, 4.5], muzzle: [0, 2.5] };
+const wReady = w => !!WSPR[w] && imgOk(IMG[WSPR[w].shoot[0]]);
+
+// Silah üzerindeki bir noktanın dünya koordinatı (namlu, kovan çıkışı, egzoz)
+function weaponPoint(p, pt, w = p.weapon) {
+  const pv = gunPivot(p);
+  let lx, ly;
+  if (wReady(w)) { const ws = WSPR[w], s = C.weapons[w].scale; lx = (pt[0] - ws.hand[0]) * s; ly = (pt[1] - ws.hand[1]) * s; }
+  else { const f = WEAPON_FALLBACK, s = C.sprites.player; lx = (f.hand[0] - f.muzzle[0]) * s; ly = (f.muzzle[1] - f.hand[1]) * s; }
+  if (Math.cos(p.angle) < 0) ly = -ly; // sola bakarken silah dikey çevrilir
   const c = Math.cos(p.angle), sn = Math.sin(p.angle);
   return { x: pv.x + lx * c - ly * sn, y: pv.y + lx * sn + ly * c };
 }
-function gunMuzzle(p) { const ws = weaponSprite(p.weapon); return weaponPoint(p, ws.muzzle, ws); }
+function gunMuzzle(p) { return weaponPoint(p, WSPR[p.weapon] ? WSPR[p.weapon].muzzle : WEAPON_FALLBACK.muzzle); }
+
+// O anki kare: şarj animasyonu, ateş animasyonu ya da bekleme (ilk kare)
+function weaponFrame(p) {
+  const ws = WSPR[p.weapon];
+  if (p.reload) { const [key, fw, fh, n] = ws.reload; return { key, fw, fh, f: Math.min(n - 1, Math.floor(p.reload.t / p.reload.dur * n)) }; }
+  const [key, fw, fh, n] = ws.shoot;
+  let f = 0;
+  if (p.shootAnim && p.shootAnim.t < p.shootAnim.dur) f = Math.min(n - 1, Math.floor(p.shootAnim.t / p.shootAnim.dur * n));
+  return { key, fw, fh, f, flash: ws.flash && f > 0 ? ws.flash : null };
+}
+// Silah elde: karakterle birlikte nişan yönüne döner, sola bakarken dikey çevrilir
 function drawWeapon(p, tint) {
-  const ws = weaponSprite(p.weapon), im = IMG[ws.key];
+  const w = p.weapon, left = Math.cos(p.angle) < 0, dir = left ? -1 : 1;
+  if (!wReady(w)) { // yedek: eski tabanca
+    const f = WEAPON_FALLBACK, im = IMG[f.key]; if (!imgOk(im)) return;
+    const pv = gunPivot(p), s = C.sprites.player, [cx, cy, cw, ch] = f.crop;
+    ctx.save(); ctx.translate(pv.x, pv.y); ctx.rotate(p.angle); if (left) ctx.scale(1, -1); ctx.scale(-s, s);
+    ctx.drawImage(im, cx, cy, cw, ch, -f.hand[0], -f.hand[1], cw, ch); ctx.restore();
+    return;
+  }
+  const ws = WSPR[w], s = C.weapons[w].scale, fr = weaponFrame(p), im = IMG[fr.key];
   if (!imgOk(im)) return;
-  const pv = gunPivot(p), s = ws.scale(), [cx, cy, cw, ch] = ws.crop;
-  ctx.save();
-  ctx.translate(pv.x, pv.y); ctx.rotate(p.angle);
-  if (Math.cos(p.angle) < 0) ctx.scale(1, -1); // sola nişan alınca silah ters dönmesin
-  ctx.scale(ws.flipX ? -s : s, s);
-  ctx.drawImage(im, cx, cy, cw, ch, -ws.hand[0], -ws.hand[1], cw, ch);
-  if (tint && ws.key === 'player1') { ctx.globalAlpha = 0.75; ctx.drawImage(tint, cx, cy, cw, ch, -ws.hand[0], -ws.hand[1], cw, ch); }
+  const pv = gunPivot(p);
+  let ang = p.angle - dir * p.recoil * 0.12, alpha = 1; // geri tepmede namlu hafif kalkar
+  if (p.switchT > 0) { const k = p.switchT / C.weaponAnim.switchTime; ang += dir * 1.2 * k; alpha = 1 - 0.6 * k; } // değiştirirken aşağıdan kalkar
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.translate(pv.x, pv.y); ctx.rotate(ang); if (left) ctx.scale(1, -1); ctx.scale(s, s);
+  ctx.drawImage(im, fr.f * fr.fw, 0, fr.fw, fr.fh, -ws.hand[0], -ws.hand[1], fr.fw, fr.fh);
+  if (fr.flash && imgOk(IMG[fr.flash[0]])) ctx.drawImage(IMG[fr.flash[0]], fr.f * fr.flash[1], 0, fr.flash[1], fr.flash[2], -ws.hand[0], -ws.hand[1], fr.flash[1], fr.flash[2]);
   ctx.restore();
 }
 function drawWeaponIcon(w, cx, cy, maxW, maxH, alpha = 1) {
-  const ws = weaponSprite(w), im = IMG[ws.key];
-  if (!imgOk(im)) { hudText(C.weapons[w].name, cx, cy, 11, '#fff', 'center'); return; }
-  const [sx, sy, sw, sh] = ws.crop, k = Math.min(maxW / sw, maxH / sh);
-  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(cx, cy);
-  if (ws.flipX) ctx.scale(-1, 1);
-  ctx.drawImage(im, sx, sy, sw, sh, -sw * k / 2, -sh * k / 2, sw * k, sh * k);
+  if (!wReady(w)) { hudText(C.weapons[w].name, cx, cy, 11, '#fff', 'center'); return; }
+  const ws = WSPR[w], [ix, iy, iw, ih] = ws.icon, k = Math.min(maxW / iw, maxH / ih);
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.drawImage(IMG[ws.shoot[0]], ix, iy, iw, ih, cx - iw * k / 2, cy - ih * k / 2, iw * k, ih * k);
   ctx.restore();
 }
+
+/* ---------- Silah değiştirme, şarjör ve şarj etme ---------- */
+const totalAmmo = (p, w) => p.mag[w] + p.ammo[w];
+function setWeapon(w) {
+  const p = player;
+  if (!p || !p.alive || p.weapon === w || !C.weapons[w]) return;
+  if (totalAmmo(p, w) <= 0) { noAmmo(w); return; }
+  p.weapon = w; p.reload = null; p.shootAnim = null;
+  p.switchT = C.weaponAnim.switchTime; p.fireCd = Math.max(p.fireCd, C.weaponAnim.switchTime * 0.6);
+  Sound.play('click', 0.02); Sound.synth('switch');
+  addText(p.x, p.y - 72, C.weapons[w].name.toLocaleUpperCase('tr-TR'), '#ffe8a3', 15, 0.7);
+}
+function cycleWeapon(dir) {
+  const p = player;
+  if (!p) return;
+  let i = WEAPON_ORDER.indexOf(p.weapon);
+  for (let k = 0; k < WEAPON_ORDER.length; k++) {
+    i = (i + dir + WEAPON_ORDER.length) % WEAPON_ORDER.length;
+    if (totalAmmo(p, WEAPON_ORDER[i]) > 0) { setWeapon(WEAPON_ORDER[i]); return; }
+  }
+}
+function noAmmo(w) {
+  const p = player;
+  if (performance.now() - (p.noAmmoAt || 0) > 600) {
+    addText(p.x, p.y - 72, 'MERMİ YOK: ' + C.weapons[w].name.toLocaleUpperCase('tr-TR'), '#ff6b6b', 14, 0.8);
+    Sound.synth('empty'); p.noAmmoAt = performance.now();
+  }
+}
+function startReload() {
+  const p = player, w = p.weapon, Wc = C.weapons[w];
+  if (!p.alive || p.reload || p.switchT > 0 || p.mag[w] >= Wc.mag || p.ammo[w] <= 0) return false;
+  p.reload = { w, t: 0, dur: Wc.reloadTime };
+  Sound.synth('reload');
+  return true;
+}
+function updateWeapon(dt) {
+  const p = player;
+  if (p.switchT > 0) p.switchT -= dt;
+  if (p.shootAnim) p.shootAnim.t += dt;
+  if (p.reload) {
+    p.reload.t += dt;
+    if (p.reload.t >= p.reload.dur) {
+      const w = p.reload.w, take = Math.min(C.weapons[w].mag - p.mag[w], p.ammo[w]);
+      p.mag[w] += take;
+      if (p.ammo[w] !== Infinity) p.ammo[w] -= take;
+      p.reload = null; Sound.synth('reloadEnd');
+    }
+  }
+}
+function fireRate(p) { return C.weapons[p.weapon].fireRate * p.stats.fireRateMult; }
+function fireWeapon() {
+  const p = player, w = p.weapon;
+  if (p.reload || p.switchT > 0) return false;
+  if (p.mag[w] <= 0) {
+    if (p.ammo[w] > 0) startReload();                     // boş şarjör: otomatik şarj
+    else if (w !== 'pistol') { noAmmo(w); setWeapon('pistol'); }
+    return false;
+  }
+  p.mag[w]--;
+  if (w === 'shotgun') shootShotgun();
+  else if (w === 'rocket') shootRocket();
+  else shootGun(w);
+  if (WSPR[w]) p.shootAnim = { t: 0, dur: Math.min(WSPR[w].shoot[3] / C.weaponAnim.shootFps, 1 / fireRate(p)) };
+  ejectCasing(p, w);
+  if (p.mag[w] <= 0 && p.ammo[w] > 0) startReload();
+  return true;
+}
+// Boş kovan: silahtan yana fırlar, yere düşüp seker ve bir süre yerde kalır
+function ejectCasing(p, w) {
+  const ws = WSPR[w];
+  if (!ws || !ws.casing || !wReady(w)) return;
+  const e = weaponPoint(p, ws.eject), dir = Math.cos(p.angle) < 0 ? -1 : 1;
+  const a = p.angle - dir * Math.PI / 2 + rand(-0.4, 0.4), sp = rand(70, 150), shell = ws.casing === 'shell';
+  addParticle({ kind: 6, x: e.x, y: p.y + rand(-3, 3), z: Math.max(4, p.y - e.y), vz: rand(150, 230),
+    vx: Math.cos(a) * sp - Math.cos(p.angle) * 30, vy: Math.sin(a) * sp * 0.5, rot: rand(0, TAU), vr: rand(-22, 22),
+    w: shell ? 5 : 3.2, h: shell ? 3 : 1.8, color: shell ? '#c92a2a' : '#e0b04a', life: 3.5, max: 3.5, drag: 2, landed: false });
+}
+
+/* ---------- Atış ---------- */
+// Tabanca, makineli ve keskin nişancı: tek mermi (tabancaya çift/yayılma kartları da etki eder)
+function shootGun(w) {
+  const p = player, s = p.stats, Wc = C.weapons[w];
+  const pistol = w === 'pistol';
+  const spreadN = pistol ? 1 + 2 * s.spread : 1, step = 0.17, par = pistol ? s.parallel : 1;
+  const speed = Wc.bulletSpeed * s.velocityMult, life = (Wc.range * s.velocityMult) / speed;
+  const ca = Math.cos(p.angle), sa = Math.sin(p.angle), mz = gunMuzzle(p);
+  for (let i = 0; i < spreadN; i++) {
+    const a = p.angle + (i - (spreadN - 1) / 2) * step + rand(-1, 1) * (Wc.spread || 0);
+    const c = Math.cos(a), sn = Math.sin(a);
+    for (let j = 0; j < par; j++) {
+      const off = (j - (par - 1) / 2) * 9, crit = Math.random() < s.crit;
+      bullets.push({
+        kind: w === 'sniper' ? 'sniper' : w === 'rifle' ? 'rifle' : 'bullet',
+        x: mz.x - sa * off, y: mz.y + ca * off, vx: c * speed, vy: sn * speed, speed, life,
+        dmg: Wc.damage * s.damageMult * (crit ? C.player.critMultiplier : 1), kb: Wc.knockback,
+        crit, pierce: (Wc.pierce || 0) + (pistol || w === 'rifle' ? s.pierce : 0), hits: [], size: w === 'sniper' ? 5 : crit ? 4 : 3,
+        fromX: p.x, fromY: p.y - 20, // ilk karede çarpışma oyuncunun gövdesinden (yapışık zombiler de vurulur)
+      });
+    }
+  }
+  p.muzzle = 0.06; p.recoil = w === 'sniper' ? 1.8 : 1; p.flash = C.light.muzzleTime;
+  shake = Math.max(shake, Wc.shake); kickCamera(p.angle, Wc.kick);
+  if (Wc.recoil) { p.kbx -= ca * Wc.recoil; p.kby -= sa * Wc.recoil; }
+  if (w === 'pistol') Sound.shoot(); else Sound.synth(w);
+  for (let i = 0; i < (w === 'sniper' ? 6 : 2); i++) addParticle({ x: mz.x, y: mz.y, vx: Math.cos(p.angle + rand(-0.5, 0.5)) * rand(150, 300), vy: Math.sin(p.angle + rand(-0.5, 0.5)) * rand(150, 300), life: 0.12, max: 0.12, size: 2, color: '#ffe066', drag: 6, kind: 1 });
+}
+function shootShotgun() {
+  const p = player, s = p.stats, Wc = C.weapons.shotgun;
+  const n = Wc.pellets + 2 * s.shotgunPellets, mz = gunMuzzle(p), life = Wc.range / Wc.bulletSpeed;
+  for (let i = 0; i < n; i++) {
+    const a = p.angle + (n > 1 ? (i / (n - 1) - 0.5) : 0) * Wc.spread + rand(-0.04, 0.04);
+    const sp = Wc.bulletSpeed * s.velocityMult * rand(0.85, 1.1), crit = Math.random() < s.crit;
+    bullets.push({ kind: 'pellet', x: mz.x, y: mz.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, speed: sp, life, maxLife: life,
+      dmg: Wc.damage * s.damageMult * (crit ? C.player.critMultiplier : 1), crit, pierce: 0, hits: [], size: 2.5,
+      fromX: p.x, fromY: p.y - 20 });
+  }
+  p.kbx -= Math.cos(p.angle) * Wc.recoil; p.kby -= Math.sin(p.angle) * Wc.recoil; // güçlü geri tepme
+  p.muzzle = 0.09; p.recoil = 1.6; p.flash = C.light.muzzleTime * 1.6;
+  shake = Math.max(shake, Wc.shake); kickCamera(p.angle, Wc.kick);
+  Sound.synth('shotgun');
+  for (let i = 0; i < 8; i++) addParticle({ x: mz.x, y: mz.y, vx: Math.cos(p.angle + rand(-0.6, 0.6)) * rand(200, 500), vy: Math.sin(p.angle + rand(-0.6, 0.6)) * rand(200, 500), life: 0.15, max: 0.15, size: 2, color: '#ffe066', drag: 7, kind: 1 });
+  for (let i = 0; i < 3; i++) addParticle({ x: mz.x, y: mz.y, vx: Math.cos(p.angle) * rand(40, 120), vy: Math.sin(p.angle) * rand(40, 120), life: 0.6, max: 0.6, size: 6, grow: 30, color: '#6b6b6b', drag: 3, kind: 3 });
+}
+function shootRocket() {
+  const p = player, s = p.stats, Wc = C.weapons.rocket;
+  const mz = gunMuzzle(p), sp = Wc.bulletSpeed * s.velocityMult;
+  bullets.push({ kind: 'rocket', x: mz.x, y: mz.y, vx: Math.cos(p.angle) * sp, vy: Math.sin(p.angle) * sp, speed: sp,
+    life: Wc.range / Wc.bulletSpeed, dmg: Wc.damage * s.damageMult, crit: false, pierce: 0, hits: [], size: 6,
+    radius: Wc.radius * (1 + 0.3 * s.rocketRadius), fromX: p.x, fromY: p.y - 20 });
+  if (wReady('rocket')) { // arkadan çıkan duman
+    const bk = weaponPoint(p, WSPR.rocket.back);
+    for (let i = 0; i < 6; i++) addParticle({ x: bk.x, y: bk.y, vx: -Math.cos(p.angle + rand(-0.5, 0.5)) * rand(80, 260), vy: -Math.sin(p.angle + rand(-0.5, 0.5)) * rand(80, 260), life: 0.8, max: 0.8, size: 7, grow: 40, color: '#7a7a7a', drag: 3, kind: 3 });
+  }
+  p.kbx -= Math.cos(p.angle) * Wc.recoil; p.kby -= Math.sin(p.angle) * Wc.recoil;
+  p.muzzle = 0.08; p.recoil = 1.4; p.flash = C.light.muzzleTime * 1.4;
+  shake = Math.max(shake, Wc.shake); kickCamera(p.angle, Wc.kick);
+  Sound.synth('rocket');
+}
+
+/* ---------- Mermi kutuları (silaha göre renk) ---------- */
+const PICKUP_LOOK = {
+  shotgun: { glow: '120,255,120', box: '#3d5a1e', top: '#5c8a2e', label: 'SAÇMA' },
+  rocket:  { glow: '255,90,70',   box: '#5a5f66', top: '#868e96', label: 'ROKET' },
+  rifle:   { glow: '255,210,80',  box: '#6b5a2a', top: '#8f7a3a', label: 'MAKİNELİ' },
+  sniper:  { glow: '90,170,255',  box: '#2a4a6b', top: '#3f6a94', label: 'NİŞANCI' },
+};
+function dropAmmo(z) {
+  const A = C.ammo, chance = z.type === 'boss' ? 1 : z.type === 'tank' ? A.tankDropChance : z.type === 'minion' ? A.dropChance * 0.5 : A.dropChance;
+  if (Math.random() >= chance) return;
+  let r = Math.random() * Object.values(A.shares).reduce((a, b) => a + b, 0), type = 'shotgun';
+  for (const [k, v] of Object.entries(A.shares)) { r -= v; if (r <= 0) { type = k; break; } }
+  pickups.push({ type, x: z.x, y: z.y, life: A.life, t: rand(0, 6), vx: rand(-80, 80), vy: rand(-80, 80) });
+}
+function updatePickups(dt) {
+  const p = player, A = C.ammo;
+  for (let i = pickups.length - 1; i >= 0; i--) {
+    const k = pickups[i];
+    k.life -= dt; k.t += dt;
+    const dr = Math.exp(-5 * dt); k.vx *= dr; k.vy *= dr;
+    if (p.alive) {
+      const dx = p.x - k.x, dy = p.y - k.y, d = Math.hypot(dx, dy) || 1;
+      if (d < A.magnet) { k.vx += dx / d * 1400 * dt; k.vy += dy / d * 1400 * dt; } // mıknatıs
+      if (d < A.pickRadius) {
+        const Wc = C.weapons[k.type], before = p.ammo[k.type];
+        p.ammo[k.type] = Math.min(Wc.reserveMax, p.ammo[k.type] + Wc.pickup);
+        addText(p.x, p.y - 62, `+${p.ammo[k.type] - before} ${PICKUP_LOOK[k.type].label}`, '#' + PICKUP_LOOK[k.type].glow.split(',').map(v => (+v).toString(16).padStart(2, '0')).join(''), 15, 0.8);
+        Sound.synth('pickup');
+        pickups.splice(i, 1); continue;
+      }
+    }
+    k.x += k.vx * dt; k.y += k.vy * dt;
+    if (k.life <= 0) pickups.splice(i, 1);
+  }
+}
+// Mermi kutusu: pakette yok, piksel stiliyle kodla çiziliyor
+function drawPickups() {
+  for (const k of pickups) {
+    if (!inView(k.x, k.y, 40) || (k.life < 3 && Math.floor(k.life * 8) % 2 === 0)) continue;
+    const L = PICKUP_LOOK[k.type], s = 2, x = Math.round(k.x - 7 * s), y = Math.round(k.y - 12 * s - Math.abs(Math.sin(k.t * 4)) * 4);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45;
+    ctx.drawImage(glowSprite(L.glow), k.x - 30, k.y - 42, 60, 60);
+    ctx.restore();
+    ctx.fillStyle = '#000'; ctx.fillRect(x - s, y - s, 16 * s, 12 * s);
+    ctx.fillStyle = L.box; ctx.fillRect(x, y, 14 * s, 10 * s);
+    ctx.fillStyle = L.top; ctx.fillRect(x, y, 14 * s, 2 * s);
+    if (k.type === 'shotgun') for (let i = 0; i < 4; i++) { ctx.fillStyle = '#d9483b'; ctx.fillRect(x + (2 + i * 3) * s, y + 3 * s, 2 * s, 4 * s); ctx.fillStyle = '#e0b04a'; ctx.fillRect(x + (2 + i * 3) * s, y + 7 * s, 2 * s, 2 * s); }
+    else if (k.type === 'rocket') { ctx.fillStyle = '#c9ccd1'; ctx.fillRect(x + 2 * s, y + 4 * s, 8 * s, 2 * s); ctx.fillStyle = '#e03131'; ctx.fillRect(x + 10 * s, y + 3 * s, 2 * s, 4 * s); }
+    else if (k.type === 'rifle') for (let i = 0; i < 5; i++) { ctx.fillStyle = '#e0b04a'; ctx.fillRect(x + (2 + i * 2.2) * s, y + 4 * s, 1.4 * s, 4 * s); ctx.fillStyle = '#b07d0b'; ctx.fillRect(x + (2 + i * 2.2) * s, y + 3 * s, 1.4 * s, 1 * s); }
+    else { ctx.fillStyle = '#e0b04a'; ctx.fillRect(x + 2 * s, y + 4 * s, 9 * s, 1.5 * s); ctx.fillRect(x + 2 * s, y + 7 * s, 9 * s, 1.5 * s); ctx.fillStyle = '#adb5bd'; ctx.fillRect(x + 11 * s, y + 4 * s, 1.5 * s, 1.5 * s); ctx.fillRect(x + 11 * s, y + 7 * s, 1.5 * s, 1.5 * s); }
+  }
+}
+
+/* ---------- Mobil butonlar (dash, silah, şarj, infaz) ---------- */
+function touchButtons() {
+  const Wr = W - safe.right, Hb = H - safe.bottom;
+  return [
+    { id: 'dash', x: Wr - 178, y: Hb - 48, r: 30, label: 'DASH' },
+    { id: 'reload', x: Wr - 214, y: Hb - 128, r: 26, label: 'ŞARJ' },
+    { id: 'glory', x: Wr - 150, y: Hb - 178, r: 30, label: 'İNFAZ' },
+    { id: 'weapon', x: Wr - 46, y: Hb - 205, r: 30, label: 'SİLAH' },
+  ];
+}
+function touchButtonAt(x, y) {
+  for (const b of touchButtons()) if (Math.hypot(x - b.x, y - b.y) < b.r + 8) return b.id;
+  return null;
+}
+function pressTouchButton(id) {
+  if (id === 'dash') tryDash();
+  else if (id === 'weapon') cycleWeapon(1);
+  else if (id === 'reload') startReload();
+  else if (id === 'glory') tryGlory();
+}
+function drawTouchButtons() {
+  if (!input.touchMode || state !== 'playing' || !player) return;
+  const p = player;
+  for (const b of touchButtons()) {
+    let active = true, ratio = 1;
+    if (b.id === 'dash') { ratio = 1 - clamp(p.dashCd / C.dash.cooldown, 0, 1); active = ratio >= 1; }
+    if (b.id === 'glory') active = !!gloryTarget;
+    if (b.id === 'reload') { active = !p.reload && p.mag[p.weapon] < C.weapons[p.weapon].mag && p.ammo[p.weapon] > 0; if (p.reload) ratio = p.reload.t / p.reload.dur; }
+    ctx.fillStyle = active ? (b.id === 'glory' ? 'rgba(255,146,43,0.85)' : 'rgba(0,0,0,0.45)') : 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.stroke();
+    ctx.strokeStyle = active ? '#fff' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2.5; ctx.stroke();
+    if ((b.id === 'dash' || b.id === 'reload') && ratio < 1) { ctx.strokeStyle = b.id === 'dash' ? '#4dd2ff' : '#ffd43b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 4, -Math.PI / 2, -Math.PI / 2 + TAU * ratio); ctx.stroke(); }
+    if (b.id === 'weapon') {
+      drawWeaponIcon(p.weapon, b.x, b.y - 5, b.r * 1.6, b.r * 0.7);
+      hudText(String(p.mag[p.weapon]), b.x, b.y + 15, 12, p.mag[p.weapon] ? '#ffd43b' : '#ff6b6b', 'center');
+    } else hudText(b.label, b.x, b.y + 1, b.id === 'dash' ? 12 : 11, active ? '#fff' : 'rgba(255,255,255,0.5)', 'center');
+  }
+}
+
+/* ---------- HUD (sağ alt): aktif silah, şarjör / yedek mermi, şarj çubuğu ---------- */
+function drawWeaponHUD() {
+  const p = player, w = p.weapon, Wc = C.weapons[w], narrow = W < 640, touch = input.touchMode;
+  const pw = narrow ? 178 : 236, ph = narrow ? 66 : 80;
+  const x = Math.round(W - 12 - safe.right - pw);
+  const y = Math.round(touch ? H - safe.bottom - 250 - ph : H - 22 - safe.bottom - ph);
+  drawNine(IMG.panel, x, y, pw, ph, 7, 2);
+  // silah ikonu (değiştirirken aşağıdan kayarak gelir)
+  const sw = p.switchT > 0 ? p.switchT / C.weaponAnim.switchTime : 0;
+  drawWeaponIcon(w, x + pw * 0.34, y + ph * 0.5 + sw * 14, pw * 0.5, ph * 0.5, 1 - sw * 0.6);
+  hudText(Wc.name.toLocaleUpperCase('tr-TR'), x + 12, y + 12, narrow ? 9 : 10, '#ced4da', 'left', 800);
+  // şarjör / yedek
+  const mag = p.mag[w], res = p.ammo[w];
+  hudText(String(mag), x + pw - 46, y + ph * 0.52, narrow ? 24 : 30, mag === 0 ? '#ff6b6b' : '#ffd43b', 'right');
+  hudText('/ ' + (res === Infinity ? '∞' : res), x + pw - 42, y + ph * 0.56, narrow ? 12 : 14, '#ced4da', 'left', 800);
+  // şarj çubuğu
+  if (p.reload) {
+    const r = clamp(p.reload.t / p.reload.dur, 0, 1), bw = pw - 24, by = y + ph - 14;
+    ctx.fillStyle = '#000'; ctx.fillRect(x + 12, by, bw, 7);
+    ctx.fillStyle = '#ffd43b'; ctx.fillRect(x + 13, by + 1, (bw - 2) * r, 5);
+    hudText('ŞARJ EDİLİYOR', x + pw - 12, y + 12, narrow ? 9 : 10, '#ffe8a3', 'right', 800);
+  } else if (mag === 0 && res > 0 && Math.floor(performance.now() / 300) % 2 === 0) hudText(touch ? 'ŞARJ!' : '[R] ŞARJ ET', x + pw / 2, y + ph - 10, 10, '#ff8787', 'center', 800);
+  // silah yuvaları (1-5)
+  if (!touch) {
+    const sz = 20, gap = 4, total = WEAPON_ORDER.length * (sz + gap) - gap;
+    WEAPON_ORDER.forEach((k, i) => {
+      const sx = x + pw - total + i * (sz + gap), sy = y - sz - 6, sel = k === w, empty = totalAmmo(p, k) <= 0;
+      ctx.fillStyle = sel ? '#ffb52e' : empty ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.6)'; ctx.fillRect(sx, sy, sz, sz);
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(sx, sy, sz, sz);
+      hudText(String(i + 1), sx + sz / 2, sy + sz / 2 + 1, 11, sel ? '#000' : empty ? '#6c757d' : '#fff', 'center');
+    });
+    // dash
+    const r = 1 - clamp(p.dashCd / C.dash.cooldown, 0, 1);
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y + ph + 4, pw + 2, 7);
+    ctx.fillStyle = r >= 1 ? '#4dd2ff' : '#2b6b85'; ctx.fillRect(x, y + ph + 5, pw * r, 5);
+    hudText('DASH [SHIFT]', x, y - 16, 10, r >= 1 ? '#4dd2ff' : '#6c8a99', 'left', 800);
+  }
+}
+
+/* =====================================================================
+   Boss (10. dalga): Azrail sprite animasyonları + çağrılan yaratıklar
+   [asset, kare genişliği, yüksekliği, kare sayısı, satırdaki kare]
+   ===================================================================== */
+const BOSS_ANIM = {
+  idle:   ['bossIdle', 100, 100, 8, 4],    // süzülerek yürüme
+  attack: ['bossAttack', 100, 100, 13, 6], // tırpan savurma (yakın saldırı)
+  skill:  ['bossSkill', 100, 100, 12, 6],  // atılma: 0-5 hazırlık, 6-9 karanlık hamle, 10-11 toparlanma
+  summon: ['bossSummon', 100, 100, 5, 4],  // yaratık çağırma
+  death:  ['bossDeath', 100, 100, 18, 10], // ölüm
+};
+const MINION_ANIM = { appear: ['minionAppear', 50, 50, 6, 3], idle: ['minionIdle', 50, 50, 4, 4], death: ['minionDeath', 50, 50, 5, 3] };
+const BOSS_FOOT = [50, 84], MINION_FOOT = [24, 38];     // ayak noktası (kare içi)
+const HB_BOSS = [-3.4, -37.9, 15.7], HB_MINION = [-0.5, -8.5, 6.3]; // görünen piksellerden ölçüldü
+const bossReady = () => imgOk(IMG.bossIdle);
+const minionReady = () => imgOk(IMG.minionIdle);
+function animRect(a, i) {
+  const [key, fw, fh, n, cols] = a;
+  i = clamp(Math.floor(i), 0, n - 1);
+  return { key, sx: (i % cols) * fw, sy: Math.floor(i / cols) * fh, sw: fw, sh: fh };
+}
+function bossFrame(z) {
+  const B = C.zombies.boss, t = z.animClock || 0;
+  switch (z.state) {
+    case 'windup':  return animRect(BOSS_ANIM.skill, (1 - z.timer / B.dashWindup) * 6);
+    case 'dash':    return animRect(BOSS_ANIM.skill, 6 + (t * 14) % 4);
+    case 'recover': return animRect(BOSS_ANIM.skill, 10 + (1 - z.timer / B.recoverTime) * 2);
+    case 'attack':  return animRect(BOSS_ANIM.attack, (1 - z.timer / B.attackTime) * 13);
+    case 'summon':  return animRect(BOSS_ANIM.summon, (1 - z.timer / B.summonTime) * 5);
+    default:        return animRect(BOSS_ANIM.idle, (t * 9) % 8);
+  }
+}
+function minionFrame(z) {
+  const M = C.zombies.minion;
+  return z.appearT > 0 ? animRect(MINION_ANIM.appear, (1 - z.appearT / M.appearTime) * 6) : animRect(MINION_ANIM.idle, ((z.animClock || 0) * 8) % 4);
+}
+// Tırpan savurma: boss'un önündeki yay içinde oyuncuya hasar
+function bossSwing(z) {
+  const B = C.zombies.boss, p = player;
+  if (!p.alive) return;
+  const h = zombieHitbox(z, _hz), ph = playerHitbox(p, _hp), d = Math.hypot(ph.x - h.x, ph.y - h.y);
+  for (let i = 0; i < 10; i++) { // savurma izi
+    const a = (z.face > 0 ? 0 : Math.PI) + rand(-1.1, 1.1);
+    addParticle({ kind: 1, x: h.x + Math.cos(a) * B.meleeRadius * 0.8, y: h.y + Math.sin(a) * B.meleeRadius * 0.6, vx: -Math.sin(a) * 260 * z.face, vy: Math.cos(a) * 260 * z.face, life: 0.25, max: 0.25, size: 2.5, color: '#d0d4da', drag: 4 });
+  }
+  Sound.synth('swing');
+  if (d < B.meleeRadius + ph.r) { damagePlayer(B.meleeDamage, h.x, h.y); shake = Math.max(shake, 12); }
+}
+// Çağırma: boss'un etrafında küçük yaratıklar belirir
+function bossSummon(z) {
+  const M = C.zombies.minion, n = C.zombies.boss.summonCount;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * TAU + rand(-0.3, 0.3), x = clamp(z.x + Math.cos(a) * 110, 40, WW - 40), y = clamp(z.y + Math.sin(a) * 80, 40, WH - 40);
+    if (pointInObstacles(x, y, M.radius)) continue;
+    spawnZombie('minion', x, y);
+  }
+  Sound.synth('summon');
+}
+
+/* ---------- Kısa animasyon efektleri (boss ve yaratık ölümü) ---------- */
+const fxAnims = [];
+function addFx(anim, x, y, dur, scale, face, foot) { fxAnims.push({ anim, x, y, t: 0, dur, scale, face, foot }); }
+function updateFx(dt) { for (let i = fxAnims.length - 1; i >= 0; i--) { fxAnims[i].t += dt; if (fxAnims[i].t >= fxAnims[i].dur) fxAnims.splice(i, 1); } }
+function drawFx() {
+  for (const f of fxAnims) {
+    const r = animRect(f.anim, f.t / f.dur * f.anim[3]), im = IMG[r.key];
+    if (!imgOk(im) || !inView(f.x, f.y - 60, 200)) continue;
+    ctx.save(); ctx.translate(f.x, f.y); ctx.scale(f.face * f.scale, f.scale);
+    ctx.drawImage(im, r.sx, r.sy, r.sw, r.sh, -f.foot[0], -f.foot[1], r.sw, r.sh);
+    ctx.restore();
+  }
+}
+
+/* ---------- Ağır çekim (boss ölümü) ---------- */
+let timeScale = 1, slowmoT = 0;
 
 /* ---------- Hit-stop ve kamera tepmesi ---------- */
 let hitStop = 0, hitStopCd = 0, camKickX = 0, camKickY = 0;
@@ -2163,77 +2578,6 @@ function addHitStop(t) {
   hitStopCd = C.feel.hitStopCooldown + hitStop;
 }
 function kickCamera(angle, amount) { camKickX -= Math.cos(angle) * amount; camKickY -= Math.sin(angle) * amount; }
-
-/* ---------- Silahlar ---------- */
-function setWeapon(w) {
-  const p = player;
-  if (!p || !p.alive || p.weapon === w) return;
-  if (w !== 'pistol' && p.ammo[w] <= 0) { noAmmo(w); return; }
-  p.weapon = w; p.fireCd = Math.min(p.fireCd, 0.12);
-  Sound.play('click', 0.02);
-  addText(p.x, p.y - 70, C.weapons[w].name.toLocaleUpperCase('tr-TR'), '#ffe8a3', 15, 0.7);
-}
-function cycleWeapon(dir) {
-  const p = player;
-  if (!p) return;
-  let i = WEAPON_ORDER.indexOf(p.weapon);
-  for (let k = 0; k < 3; k++) {
-    i = (i + dir + 3) % 3;
-    const w = WEAPON_ORDER[i];
-    if (w === 'pistol' || p.ammo[w] > 0) { setWeapon(w); return; }
-  }
-}
-function noAmmo(w) {
-  const p = player;
-  if (performance.now() - (p.noAmmoAt || 0) > 600) {
-    addText(p.x, p.y - 70, (w === 'rocket' ? 'ROKET' : 'SAÇMA') + ' YOK!', '#ff6b6b', 15, 0.8);
-    Sound.synth('empty'); p.noAmmoAt = performance.now();
-  }
-}
-function fireRate(p) { return (p.weapon === 'pistol' ? C.player.fireRate : C.weapons[p.weapon].fireRate) * p.stats.fireRateMult; }
-function fireWeapon() {
-  const p = player, w = p.weapon;
-  if (w !== 'pistol' && p.ammo[w] <= 0) { noAmmo(w); p.weapon = 'pistol'; return false; }
-  if (w === 'pistol') { shoot(); shake = Math.max(shake, C.weapons.pistol.shake); kickCamera(p.angle, C.weapons.pistol.kick); }
-  else if (w === 'shotgun') shootShotgun();
-  else shootRocket();
-  return true;
-}
-function shootShotgun() {
-  const p = player, s = p.stats, W = C.weapons.shotgun;
-  p.ammo.shotgun--;
-  const n = W.pellets + 2 * s.shotgunPellets, mz = gunMuzzle(p);
-  const life = (W.range * s.velocityMult) / (W.speed * s.velocityMult);
-  for (let i = 0; i < n; i++) {
-    const a = p.angle + (n > 1 ? (i / (n - 1) - 0.5) : 0) * W.spread + rand(-0.04, 0.04);
-    const sp = W.speed * s.velocityMult * rand(0.85, 1.1), crit = Math.random() < s.crit;
-    bullets.push({ kind: 'pellet', x: mz.x, y: mz.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, speed: sp, life, maxLife: life,
-      dmg: W.damage * s.damageMult * (crit ? C.player.critMultiplier : 1), crit, pierce: 0, hits: [], size: 2.5,
-      fromX: p.x, fromY: p.y - 20 });
-  }
-  p.kbx -= Math.cos(p.angle) * W.recoil; p.kby -= Math.sin(p.angle) * W.recoil; // güçlü geri tepme
-  p.muzzle = 0.09; p.recoil = 1.6; p.flash = C.light.muzzleTime * 1.6;
-  shake = Math.max(shake, W.shake); kickCamera(p.angle, W.kick);
-  Sound.synth('shotgun');
-  for (let i = 0; i < 8; i++) addParticle({ x: mz.x, y: mz.y, vx: Math.cos(p.angle + rand(-0.6, 0.6)) * rand(200, 500), vy: Math.sin(p.angle + rand(-0.6, 0.6)) * rand(200, 500), life: 0.15, max: 0.15, size: 2, color: '#ffe066', drag: 7, kind: 1 });
-  for (let i = 0; i < 3; i++) addParticle({ x: mz.x, y: mz.y, vx: Math.cos(p.angle) * rand(40, 120), vy: Math.sin(p.angle) * rand(40, 120), life: 0.6, max: 0.6, size: 6, grow: 30, color: '#6b6b6b', drag: 3, kind: 3 });
-}
-function shootRocket() {
-  const p = player, s = p.stats, W = C.weapons.rocket;
-  p.ammo.rocket--;
-  const ws = weaponSprite('rocket'), mz = gunMuzzle(p), sp = W.speed * s.velocityMult;
-  bullets.push({ kind: 'rocket', x: mz.x, y: mz.y, vx: Math.cos(p.angle) * sp, vy: Math.sin(p.angle) * sp, speed: sp,
-    life: W.range / W.speed, dmg: W.damage * s.damageMult, crit: false, pierce: 0, hits: [], size: 6,
-    radius: W.radius * (1 + 0.3 * s.rocketRadius), fromX: p.x, fromY: p.y - 20 });
-  if (ws.back) { // arkadan çıkan duman
-    const bk = weaponPoint(p, ws.back, ws);
-    for (let i = 0; i < 6; i++) addParticle({ x: bk.x, y: bk.y, vx: -Math.cos(p.angle + rand(-0.5, 0.5)) * rand(80, 260), vy: -Math.sin(p.angle + rand(-0.5, 0.5)) * rand(80, 260), life: 0.8, max: 0.8, size: 7, grow: 40, color: '#7a7a7a', drag: 3, kind: 3 });
-  }
-  p.kbx -= Math.cos(p.angle) * W.recoil; p.kby -= Math.sin(p.angle) * W.recoil;
-  p.muzzle = 0.08; p.recoil = 1.4; p.flash = C.light.muzzleTime * 1.4;
-  shake = Math.max(shake, W.shake); kickCamera(p.angle, W.kick);
-  Sound.synth('rocket');
-}
 
 /* ---------- Patlamalar (roket, varil, öldürme) ---------- */
 const FIRE_COLORS = ['255,214,90', '255,160,60', '255,110,40', '255,240,170'];
@@ -2338,57 +2682,6 @@ function drawBarrel(br) {
     ctx.fillStyle = '#8c1d17'; ctx.fillRect(x, y, w, 2 * s);
     ctx.fillStyle = '#ffd43b'; ctx.fillRect(x + 3 * s, y + 6 * s, 6 * s, 4 * s); // tehlike etiketi
     ctx.fillStyle = '#000'; ctx.fillRect(x + 5 * s, y + 7 * s, 2 * s, s); ctx.fillRect(x + 4 * s, y + 8 * s, 4 * s, s);
-  }
-}
-
-/* ---------- Mermi kutuları ---------- */
-function dropAmmo(z) {
-  const A = C.ammo, chance = z.type === 'boss' ? 1 : z.type === 'tank' ? A.tankDropChance : A.dropChance;
-  if (Math.random() >= chance) return;
-  const type = Math.random() < A.rocketShare ? 'rocket' : 'shotgun';
-  pickups.push({ type, x: z.x, y: z.y, life: A.life, t: rand(0, 6), vx: rand(-80, 80), vy: rand(-80, 80) });
-}
-function updatePickups(dt) {
-  const p = player, A = C.ammo;
-  for (let i = pickups.length - 1; i >= 0; i--) {
-    const k = pickups[i];
-    k.life -= dt; k.t += dt;
-    const dr = Math.exp(-5 * dt); k.vx *= dr; k.vy *= dr;
-    if (p.alive) {
-      const dx = p.x - k.x, dy = p.y - k.y, d = Math.hypot(dx, dy) || 1;
-      if (d < A.magnet) { k.vx += dx / d * 1400 * dt; k.vy += dy / d * 1400 * dt; } // mıknatıs
-      if (d < A.pickRadius) {
-        const W = C.weapons[k.type], before = p.ammo[k.type];
-        p.ammo[k.type] = Math.min(W.ammoMax, p.ammo[k.type] + W.ammoPickup);
-        addText(p.x, p.y - 60, `+${p.ammo[k.type] - before} ${k.type === 'rocket' ? 'ROKET' : 'SAÇMA'}`, k.type === 'rocket' ? '#ff8787' : '#8ce99a', 15, 0.8);
-        Sound.synth('pickup');
-        pickups.splice(i, 1); continue;
-      }
-    }
-    k.x += k.vx * dt; k.y += k.vy * dt;
-    if (k.life <= 0) pickups.splice(i, 1);
-  }
-}
-// Mermi kutusu: pakette yok, piksel stiliyle kodla çiziliyor (karanlıkta parlar)
-function drawPickups() {
-  for (const k of pickups) {
-    if (!inView(k.x, k.y, 40) || (k.life < 3 && Math.floor(k.life * 8) % 2 === 0)) continue;
-    const s = 2, x = Math.round(k.x - 7 * s), y = Math.round(k.y - 12 * s - Math.abs(Math.sin(k.t * 4)) * 4);
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5;
-    ctx.drawImage(glowSprite(k.type === 'rocket' ? '255,90,70' : '120,255,120'), k.x - 34, k.y - 46, 68, 68);
-    ctx.restore();
-    ctx.fillStyle = '#000'; ctx.fillRect(x - s, y - s, 16 * s, 12 * s);
-    if (k.type === 'shotgun') {
-      ctx.fillStyle = '#3d5a1e'; ctx.fillRect(x, y, 14 * s, 10 * s);
-      ctx.fillStyle = '#5c8a2e'; ctx.fillRect(x, y, 14 * s, 2 * s);
-      for (let i = 0; i < 4; i++) { ctx.fillStyle = '#d9483b'; ctx.fillRect(x + (2 + i * 3) * s, y + 3 * s, 2 * s, 4 * s); ctx.fillStyle = '#e0b04a'; ctx.fillRect(x + (2 + i * 3) * s, y + 7 * s, 2 * s, 2 * s); }
-    } else {
-      ctx.fillStyle = '#5a5f66'; ctx.fillRect(x, y, 14 * s, 10 * s);
-      ctx.fillStyle = '#868e96'; ctx.fillRect(x, y, 14 * s, 2 * s);
-      ctx.fillStyle = '#c9ccd1'; ctx.fillRect(x + 2 * s, y + 4 * s, 8 * s, 2 * s);
-      ctx.fillStyle = '#e03131'; ctx.fillRect(x + 10 * s, y + 3 * s, 2 * s, 4 * s);
-      ctx.fillStyle = '#343a40'; ctx.fillRect(x + s, y + 3 * s, s, 4 * s);
-    }
   }
 }
 
@@ -2541,72 +2834,8 @@ function damageNumber(z, dmg, crit) {
   while (texts.length > C.feel.maxTexts) texts.shift();
 }
 
-/* ---------- Mobil butonlar (dash, silah, infaz) ---------- */
-function touchButtons() {
-  const Wr = W - safe.right, Hb = H - safe.bottom;
-  return [
-    { id: 'dash', x: Wr - 178, y: Hb - 48, r: 30, label: 'DASH' },
-    { id: 'glory', x: Wr - 152, y: Hb - 168, r: 30, label: 'İNFAZ' },
-    { id: 'weapon', x: Wr - 46, y: Hb - 205, r: 30, label: 'SİLAH' },
-  ];
-}
-function touchButtonAt(x, y) {
-  for (const b of touchButtons()) if (Math.hypot(x - b.x, y - b.y) < b.r + 10) return b.id;
-  return null;
-}
-function pressTouchButton(id) {
-  if (id === 'dash') tryDash();
-  else if (id === 'weapon') cycleWeapon(1);
-  else if (id === 'glory') tryGlory();
-}
-function drawTouchButtons() {
-  if (!input.touchMode || state !== 'playing' || !player) return;
-  const p = player;
-  for (const b of touchButtons()) {
-    let active = true, ratio = 1;
-    if (b.id === 'dash') { ratio = 1 - clamp(p.dashCd / C.dash.cooldown, 0, 1); active = ratio >= 1; }
-    if (b.id === 'glory') active = !!gloryTarget;
-    ctx.fillStyle = active ? (b.id === 'glory' ? 'rgba(255,146,43,0.85)' : 'rgba(0,0,0,0.45)') : 'rgba(0,0,0,0.25)';
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.stroke();
-    ctx.strokeStyle = active ? '#fff' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2.5; ctx.stroke();
-    if (b.id === 'dash' && ratio < 1) { ctx.strokeStyle = '#4dd2ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 4, -Math.PI / 2, -Math.PI / 2 + TAU * ratio); ctx.stroke(); }
-    if (b.id === 'weapon') {
-      drawWeaponIcon(p.weapon, b.x, b.y - 4, b.r * 1.5, b.r * 0.8);
-      hudText(p.weapon === 'pistol' ? '∞' : String(p.ammo[p.weapon]), b.x, b.y + 15, 11, '#ffd43b', 'center');
-    } else hudText(b.label, b.x, b.y + 1, b.id === 'glory' ? 11 : 12, active ? '#fff' : 'rgba(255,255,255,0.5)', 'center');
-  }
-}
-
-/* ---------- HUD: silahlar, mermi, dash, kombo ---------- */
-function drawWeaponHUD() {
-  if (input.touchMode) return; // telefonda silah ve mermi SİLAH butonunda, dash dolumu DASH butonunda
-  const p = player, narrow = W < 640;
-  const slotW = narrow ? 64 : 88, slotH = narrow ? 44 : 52, gap = 6;
-  const list = narrow ? [p.weapon] : WEAPON_ORDER;
-  const total = list.length * slotW + (list.length - 1) * gap;
-  let x = Math.round(W / 2 - total / 2);
-  const y = H - slotH - 22 - safe.bottom;
-  list.forEach(w => {
-    const sel = w === p.weapon, i = WEAPON_ORDER.indexOf(w);
-    ctx.globalAlpha = sel ? 1 : 0.6;
-    drawNine(sel ? IMG.panel : IMG.panelDark, x, y, slotW, slotH, 7, 2);
-    ctx.globalAlpha = 1;
-    drawWeaponIcon(w, x + slotW / 2, y + slotH * 0.42, slotW - 22, slotH * 0.42, sel ? 1 : 0.65);
-    const ammo = w === 'pistol' ? '∞' : String(p.ammo[w]);
-    hudText(ammo, x + slotW / 2, y + slotH - 11, narrow ? 12 : 13, w !== 'pistol' && p.ammo[w] === 0 ? '#ff6b6b' : '#ffd43b', 'center');
-    if (!narrow) hudText(String(i + 1), x + 9, y + 10, 11, sel ? '#ffd43b' : '#adb5bd', 'center');
-    if (sel) { ctx.strokeStyle = '#ffb52e'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, slotW - 2, slotH - 2); }
-    x += slotW + gap;
-  });
-  // dash göstergesi
-  const r = 1 - clamp(p.dashCd / C.dash.cooldown, 0, 1), bw = total, by = y + slotH + 5, bx = Math.round(W / 2 - total / 2);
-  ctx.fillStyle = '#000'; ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
-  ctx.fillStyle = r >= 1 ? '#4dd2ff' : '#2b6b85'; ctx.fillRect(bx, by, bw * r, 5);
-  if (!narrow) hudText('DASH [SHIFT]', bx + bw + 8, by + 2, 10, r >= 1 ? '#4dd2ff' : '#6c8a99', 'left', 800);
-}
 function drawComboHUD(top) {
-  const right = W - 12 - safe.right, narrow = W < 640;
+  const right = W - 12 - safe.right, narrow = W < 780;
   if (combo.count >= 2) {
     const x = narrow ? right : right - 168, y = narrow ? top + 116 : top + 82;
     const pulse = 1 + 0.15 * Math.max(0, 1 - (C.combo.window + C.combo.windowPerLevel * player.stats.comboTime - combo.timer) * 4);
@@ -2961,6 +3190,12 @@ function drawParticles(emissive) {
       ctx.fillStyle = '#1a0d10'; ctx.fillRect(-p.size / 2 - 1, -p.size / 2 - 1, p.size + 2, p.size + 2);
       ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
       ctx.restore();
+    } else if (p.kind === 6) { // boş kovan
+      ctx.globalAlpha = Math.min(1, p.life * 1.5);
+      ctx.save(); ctx.translate(p.x, p.y - p.z); ctx.rotate(p.rot);
+      ctx.fillStyle = '#3a2a10'; ctx.fillRect(-p.w / 2 - 0.8, -p.h / 2 - 0.8, p.w + 1.6, p.h + 1.6);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
     } else if (p.kind === 5) { // ateş topu (toplamalı parlak)
       const s = Math.max(1, p.size) * 2;
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a;
@@ -3037,7 +3272,9 @@ function zombieAnim(z) {
   };
 }
 function zombieSprite(z) {
-  if (z.type === 'runner') {
+  if (z.type === 'boss' && bossReady()) { const r = bossFrame(z); r.ax = BOSS_FOOT[0]; r.ay = BOSS_FOOT[1]; r.top = 63; r.s = C.sprites.bossSheet; return r; }
+  if (z.type === 'minion' && minionReady()) { const r = minionFrame(z); r.ax = MINION_FOOT[0]; r.ay = MINION_FOOT[1]; r.top = 20; r.s = C.sprites.minion; return r; }
+  if (z.type === 'runner' || z.type === 'minion') {
     const key = (Math.floor(z.animT / Math.PI) & 1) ? 'runner2' : 'runner1'; // Zombie1/2: 2 kareli yürüyüş
     return { key, sx: 0, sy: 0, sw: 16, sh: 16, ax: 8, ay: 16, top: 11, s: C.sprites.runner };
   }
@@ -3054,6 +3291,11 @@ function drawZombieSprite(z) {
   ctx.translate(z.x + ox, z.y - a.bob);
   ctx.rotate(a.rot);
   ctx.scale(z.face * a.sx * sp.s, a.sy * sp.s);
+  const bt = z.type === 'boss' && bossReady() && TINT[sp.key + '#ff2020'];
+  if (bt) { // koyu boss zeminde kaybolmasın: arkasında kırmızı çerçeve
+    ctx.save(); ctx.globalAlpha = 0.45; ctx.translate(0, -38); ctx.scale(1.08, 1.05); ctx.translate(0, 38);
+    ctx.drawImage(bt, sp.sx, sp.sy, sp.sw, sp.sh, -sp.ax, -sp.ay, sp.sw, sp.sh); ctx.restore();
+  }
   const gt = TINT[sp.key + '#ff9a1a'];
   if (gt && gloryEligible(z)) { // infaz edilebilir: arkasında nabız gibi atan turuncu çerçeve
     ctx.save(); ctx.globalAlpha = 0.55 + 0.35 * Math.sin(performance.now() / 90);
@@ -3102,7 +3344,8 @@ function drawPlayerSprite() {
   drawWeapon(p, flash ? TINT['player1#ff3030'] : null);
   // namlu parlaması (Player/Shot.png)
   if (p.muzzle > 0) {
-    const m = gunMuzzle(p), ms = C.sprites.muzzle * (p.weapon === 'shotgun' ? 1.7 : p.weapon === 'rocket' ? 1.4 : 1);
+    const m = gunMuzzle(p), ms = C.sprites.muzzle;
+    if (wReady(p.weapon)) return; // yeni silahların namlu parlaması kendi sprite sayfasında
     if (imgOk(IMG.muzzle)) {
       ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(p.angle);
       ctx.drawImage(IMG.muzzle, -5 * ms, -10.5 * ms, 25 * ms, 21 * ms);
@@ -3217,40 +3460,49 @@ function drawGround() {
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) ctx.drawImage(getChunk(i, j), i * CHUNK, j * CHUNK, size, size);
 }
 function drawBullets() {
+  // kısa iz çizgileri (türe göre renk/uzunluk), her tür tek yolda çizilir
   ctx.lineCap = 'round';
-  for (const critPass of [false, true]) { // kısa iz çizgisi
-    ctx.beginPath();
+  const TRAILS = [['bullet', 'rgba(255,240,64,0.45)', 3, 0.022], ['rifle', 'rgba(255,200,80,0.5)', 3, 0.02],
+                  ['sniper', 'rgba(220,240,255,0.8)', 3.5, 0.05], ['pellet', 'rgba(255,220,120,0.35)', 2, 0.015]];
+  for (const [kind, col, lw, len] of TRAILS) {
+    ctx.beginPath(); let any = false;
     for (const b of bullets) {
-      if (b.crit !== critPass || !inView(b.x, b.y, 30)) continue;
-      ctx.moveTo(b.x - b.vx * 0.025, b.y - b.vy * 0.025); ctx.lineTo(b.x, b.y);
+      if ((b.kind || 'bullet') !== kind || !inView(b.x, b.y, 40)) continue;
+      ctx.moveTo(b.x - b.vx * len, b.y - b.vy * len); ctx.lineTo(b.x, b.y); any = true;
     }
-    ctx.strokeStyle = critPass ? 'rgba(255,140,40,0.55)' : 'rgba(255,240,64,0.4)'; ctx.lineWidth = critPass ? 5 : 3.5;
-    ctx.stroke();
+    if (any) { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke(); }
   }
-  const ok = imgOk(IMG.bullet), bs = C.sprites.bullet;
   for (const b of bullets) {
-    if (!inView(b.x, b.y, 20)) continue;
+    if (!inView(b.x, b.y, 30)) continue;
     if (b.kind === 'rocket') { drawRocket(b); continue; }
-    if (ok) {
-      const s = 12 * bs * (b.crit ? 1.4 : 1) * (b.kind === 'pellet' ? 0.65 : 1);
-      ctx.drawImage(IMG.bullet, 2, 2, 12, 12, b.x - s / 2, b.y - s / 2, s, s);
-      if (b.crit && imgOk(IMG.bulletRing)) ctx.drawImage(IMG.bulletRing, 2, 2, 12, 12, b.x - s * 0.75, b.y - s * 0.75, s * 1.5, s * 1.5);
+    if (b.kind === 'pellet') { // saçma tanesi
+      ctx.fillStyle = '#2b2b2b'; circle(b.x, b.y, 2.6);
+      ctx.fillStyle = b.crit ? '#ffb347' : '#ffe8a3'; circle(b.x - 0.6, b.y - 0.6, 1.4);
+      continue;
+    }
+    const img = (b.kind === 'rifle' || b.kind === 'sniper') ? IMG.bRifle : IMG.bPistol; // paketteki mermi görselleri
+    if (imgOk(img)) {
+      const sc = b.kind === 'sniper' ? 3.6 : 2.6 * (b.crit ? 1.3 : 1);
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.drawImage(img, 7, 6, 5, 4, -2.5 * sc, -2 * sc, 5 * sc, 4 * sc);
+      ctx.restore();
     } else { ctx.fillStyle = b.crit ? '#ffb347' : '#fff5cc'; circle(b.x, b.y, b.size); }
   }
 }
-// Roket: pakette yok, piksel stiliyle kodla çiziliyor
+// Roket: paketteki M20 roket görseli (yoksa kodla çizilir); arkasında parlama + duman izi (updateBullets)
 function drawRocket(b) {
-  const a = Math.atan2(b.vy, b.vx), s = 2;
+  const a = Math.atan2(b.vy, b.vx);
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.8;
-  ctx.drawImage(glowSprite('255,170,70'), b.x - Math.cos(a) * 14 - 22, b.y - Math.sin(a) * 14 - 22, 44, 44);
+  ctx.drawImage(glowSprite('255,170,70'), b.x - Math.cos(a) * 26 - 22, b.y - Math.sin(a) * 26 - 22, 44, 44);
   ctx.restore();
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(a);
-  ctx.fillStyle = '#000'; ctx.fillRect(-9 * s, -2 * s, 15 * s, 4 * s); ctx.fillRect(-10 * s, -3 * s, 3 * s, 6 * s);
-  ctx.fillStyle = '#9aa0a6'; ctx.fillRect(-8 * s, -1.5 * s, 11 * s, 3 * s);
-  ctx.fillStyle = '#c9ccd1'; ctx.fillRect(-8 * s, -1.5 * s, 11 * s, 1 * s);
-  ctx.fillStyle = '#e03131'; ctx.fillRect(3 * s, -1.5 * s, 3 * s, 3 * s);
-  ctx.fillStyle = '#495057'; ctx.fillRect(-10 * s, -2.5 * s, 2 * s, 5 * s);
-  ctx.fillStyle = '#ffd43b'; ctx.fillRect(-12 * s, -1 * s, 2 * s, 2 * s);
+  if (imgOk(IMG.bRocket)) { const sc = 1.6; ctx.drawImage(IMG.bRocket, 1, 5, 30, 5, -22 * sc, -2.5 * sc, 30 * sc, 5 * sc); }
+  else {
+    const s = 2;
+    ctx.fillStyle = '#000'; ctx.fillRect(-9 * s, -2 * s, 15 * s, 4 * s);
+    ctx.fillStyle = '#9aa0a6'; ctx.fillRect(-8 * s, -1.5 * s, 11 * s, 3 * s);
+    ctx.fillStyle = '#e03131'; ctx.fillRect(3 * s, -1.5 * s, 3 * s, 3 * s);
+  }
   ctx.restore();
 }
 function drawZombieBars() {
@@ -3307,7 +3559,7 @@ function hudText(text, x, y, size, color, align = 'left', weight = 900) {
   ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
 }
 function drawHUD() {
-  const p = player, narrow = W < 640, u = narrow ? 2 : 3;
+  const p = player, narrow = W < 780, u = W < 640 ? 2 : 3; // dar ekranda dalga paneli ikinci satıra iner
   const top = 12 + safe.top, left = 12 + safe.left, right = W - 12 - safe.right;
   // Can barı (sol üst): kalp + Pixel UI barı
   const hbW = narrow ? Math.min(170, W * 0.42) : 250, hbH = 11 * u;
@@ -3346,7 +3598,7 @@ function drawHUD() {
   const boss = wave.boss;
   if (boss && !boss.dead) {
     const bw = Math.min(520, W - 40), bh = 11 * u, bxx = W / 2 - bw / 2, byy = wy + ph + 18;
-    hudText('DEV ZOMBİ' + (boss.enraged ? ' (ÖFKELİ)' : ''), W / 2, byy - 6, 13, '#ffc9c9', 'center');
+    hudText('AZRAİL' + (boss.enraged ? ' (ÖFKELİ)' : ''), W / 2, byy - 6, 13, '#ffc9c9', 'center');
     drawPixelBar(bxx, byy + 2, bw, bh, clamp(boss.hp / boss.maxHp, 0, 1), IMG.barRed);
   }
 }
@@ -3488,7 +3740,7 @@ function drawZombieEyes() {
   if (L.eyeGlow <= 0 || !imgOk(IMG.zpack)) return;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (const z of zombies) {
-    if (!inView(z.x, z.y - 40, z.r + 100)) continue;
+    if (!inView(z.x, z.y - 40, z.r + 100) || z.type === 'boss' || z.type === 'minion') continue;
     const sp = zombieSprite(z), a = zombieAnim(z), cr = Math.cos(a.rot), sr = Math.sin(a.rot);
     if (gloryEligible(z)) { // karanlıkta da görünsün
       const h = zombieHitbox(z, _hb2), r = h.r * 2.4;
@@ -3560,6 +3812,7 @@ function render() {
   for (const o of drawList) drawShadow(o);
   drawList.sort((a, b) => a.sortY - b.sortY);
   for (const o of drawList) drawObject(o);
+  drawFx();
   if (player) drawBlades();
   drawParticles(false);
   drawFog();
@@ -3606,7 +3859,7 @@ function newGame() {
   player = createPlayer();
   zombies = []; bullets = []; particles = []; decals = []; drips = []; texts = []; lights = []; pickups = [];
   explosionQueue.length = 0; combo.count = 0; combo.timer = 0; combo.best = 0; combo.callout = null;
-  hitStop = 0; hitStopCd = 0; camKickX = camKickY = 0; gloryTarget = null;
+  hitStop = 0; hitStopCd = 0; camKickX = camKickY = 0; gloryTarget = null; fxAnims.length = 0; slowmoT = 0; timeScale = 1;
   score = 0; kills = 0; playTime = 0; zombieId = 0; shake = 0; hitVignette = 0; banner = null;
   wave.num = 0; wave.queue = []; wave.active = false; wave.cleared = false; wave.boss = null;
   camX = player.x; camY = player.y; clampCamera();
@@ -3703,8 +3956,10 @@ function frame(now) {
   if (dt < 0) dt = 0;
   if (state === 'playing') {
     hitStopCd -= dt;
+    if (slowmoT > 0) { slowmoT -= dt; timeScale = C.zombies.boss.deathSlowmo; } // boss ölümü: ağır çekim
+    else timeScale += (1 - timeScale) * Math.min(1, dt * 3);
     if (hitStop > 0) hitStop -= dt; // hit-stop: oyun kısa süre donar, çizim devam eder
-    else update(dt);
+    else update(dt * timeScale);
   }
   else if (state === 'menu') { // menüde kamera yavaşça süzülür
     menuTime += dt;
@@ -3745,7 +4000,7 @@ window.ZD = {
   get wave() { return wave; }, get bullets() { return bullets; }, get score() { return score; },
   startWave, chooseUpgrade, openUpgrade, newGame, update, render, CONFIG,
   get cards() { return currentCards; }, input, sticks, world, zombieHitbox, playerHitbox,
-  get debugHitbox() { return debugHitbox; }, set debugHitbox(v) { debugHitbox = v; },
+  get debugHitbox() { return debugHitbox; }, set debugHitbox(v) { debugHitbox = v; }, get timeScale() { return timeScale; }, get slowmoT() { return slowmoT; }, get cam() { return { x: camX, y: camY, s: viewScale }; },
   get pickups() { return pickups; }, get combo() { return combo; }, get hitStop() { return hitStop; }, get gloryTarget() { return gloryTarget; },
   setWeapon, tryDash, tryGlory, detonate, Music, PLAYLIST, get particles() { return particles; }, get texts() { return texts; },
 };
